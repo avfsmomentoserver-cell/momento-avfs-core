@@ -25,3 +25,6 @@ build/
 
 # GitHub tokens
 token_github_*
+
+# Large backup files
+backup_*.tar.gz
