@@ -1,0 +1,274 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===========================================================================
+   AVFS / Momento Core — "instrument console" design system.
+   Deep ink chassis, phosphor-mint signal, amber caution, crimson failure.
+   Every colour is HSL so Tailwind tokens stay composable.
+   =========================================================================== */
+
+@layer base {
+  :root,
+  .dark {
+    /* chassis */
+    --background: 220 42% 3%;
+    --foreground: 210 30% 94%;
+
+    --card: 218 38% 6%;
+    --card-foreground: 210 30% 94%;
+
+    --popover: 218 40% 5%;
+    --popover-foreground: 210 30% 94%;
+
+    /* phosphor mint — the signal colour */
+    --primary: 158 88% 60%;
+    --primary-foreground: 220 45% 5%;
+
+    /* instrument cyan */
+    --secondary: 199 89% 60%;
+    --secondary-foreground: 220 45% 5%;
+
+    --muted: 217 28% 12%;
+    --muted-foreground: 215 18% 60%;
+
+    --accent: 199 89% 60%;
+    --accent-foreground: 220 45% 5%;
+
+    --destructive: 353 100% 65%;
+    --destructive-foreground: 220 45% 5%;
+
+    --border: 216 30% 13%;
+    --input: 216 30% 13%;
+    --ring: 158 88% 60%;
+
+    --radius: 0.625rem;
+
+    /* semantic instrument tokens */
+    --signal: 158 88% 60%;
+    --caution: 36 100% 56%;
+    --critical: 353 100% 65%;
+    --info: 199 89% 60%;
+    --violet: 258 90% 72%;
+    --ink: 220 45% 2%;
+    --panel-raised: 217 34% 9%;
+    --grid-line: 216 30% 11%;
+
+    --sidebar-background: 220 44% 4%;
+    --sidebar-foreground: 214 20% 72%;
+    --sidebar-primary: 158 88% 60%;
+    --sidebar-primary-foreground: 220 45% 5%;
+    --sidebar-accent: 217 30% 10%;
+    --sidebar-accent-foreground: 210 30% 94%;
+    --sidebar-border: 216 30% 12%;
+    --sidebar-ring: 158 88% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: "Inter Tight", system-ui, -apple-system, sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv11", "ss01";
+    /* Atmosphere: two soft phosphor blooms over a fine technical grid. */
+    background-image:
+      radial-gradient(900px 520px at 12% -8%, hsl(158 88% 60% / 0.07), transparent 65%),
+      radial-gradient(760px 460px at 92% 4%, hsl(199 89% 60% / 0.06), transparent 62%),
+      linear-gradient(hsl(var(--grid-line) / 0.55) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--grid-line) / 0.55) 1px, transparent 1px);
+    background-size: 100% 100%, 100% 100%, 46px 46px, 46px 46px;
+    background-attachment: fixed;
+    background-position: 0 0, 0 0, -1px -1px, -1px -1px;
+  }
+
+  ::selection {
+    background: hsl(var(--signal) / 0.28);
+    color: hsl(var(--foreground));
+  }
+
+  /* Numeric readouts are always monospaced and tabular. */
+  .tnum,
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  ::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+  }
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--ink));
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(216 28% 18%);
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(216 28% 26%);
+  }
+}
+
+@layer components {
+  /* --- surfaces ---------------------------------------------------------- */
+  .panel {
+    @apply relative rounded-xl border border-border/80 bg-card/70 backdrop-blur-sm;
+    box-shadow:
+      inset 0 1px 0 hsl(210 40% 100% / 0.04),
+      0 12px 34px -22px hsl(220 60% 0% / 0.9);
+  }
+
+  .panel-raised {
+    @apply panel;
+    background-color: hsl(var(--panel-raised) / 0.82);
+  }
+
+  /* A hairline of signal colour across the top edge of a hero panel. */
+  .panel-lit::before {
+    content: "";
+    @apply pointer-events-none absolute inset-x-0 top-0 h-px;
+    background: linear-gradient(90deg, transparent, hsl(var(--signal) / 0.65), transparent);
+  }
+
+  .hud-label {
+    @apply text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground;
+  }
+
+  .hud-value {
+    @apply font-mono text-2xl font-semibold tabular-nums text-foreground;
+  }
+
+  /* --- chips ------------------------------------------------------------- */
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider;
+  }
+
+  .chip-signal {
+    @apply chip;
+    border-color: hsl(var(--signal) / 0.35);
+    background-color: hsl(var(--signal) / 0.12);
+    color: hsl(var(--signal));
+  }
+
+  .chip-caution {
+    @apply chip;
+    border-color: hsl(var(--caution) / 0.35);
+    background-color: hsl(var(--caution) / 0.12);
+    color: hsl(var(--caution));
+  }
+
+  .chip-critical {
+    @apply chip;
+    border-color: hsl(var(--critical) / 0.35);
+    background-color: hsl(var(--critical) / 0.12);
+    color: hsl(var(--critical));
+  }
+
+  .chip-info {
+    @apply chip;
+    border-color: hsl(var(--info) / 0.35);
+    background-color: hsl(var(--info) / 0.12);
+    color: hsl(var(--info));
+  }
+
+  .chip-muted {
+    @apply chip border-border bg-muted/50 text-muted-foreground;
+  }
+
+  /* --- meters ------------------------------------------------------------ */
+  .meter-track {
+    @apply h-1.5 w-full overflow-hidden rounded-full bg-muted/70;
+  }
+
+  .meter-fill {
+    @apply h-full rounded-full transition-[width] duration-700 ease-out;
+  }
+
+  /* Signal-coloured glow used on live indicators. */
+  .glow-signal {
+    box-shadow: 0 0 0 1px hsl(var(--signal) / 0.35), 0 0 18px hsl(var(--signal) / 0.35);
+  }
+
+  .text-glow {
+    text-shadow: 0 0 22px hsl(var(--signal) / 0.45);
+  }
+
+  /* Scanline sweep for the live-feed banner. */
+  .scanline::after {
+    content: "";
+    @apply pointer-events-none absolute inset-0;
+    background: linear-gradient(180deg, transparent 0%, hsl(var(--signal) / 0.05) 50%, transparent 100%);
+    background-size: 100% 220%;
+    animation: scan 5.5s linear infinite;
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@keyframes scan {
+  0% {
+    background-position: 0 -110%;
+  }
+  100% {
+    background-position: 0 110%;
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 hsl(var(--signal) / 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 9px hsl(var(--signal) / 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 hsl(var(--signal) / 0);
+  }
+}
+
+@keyframes ticker-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(320%);
+  }
+}

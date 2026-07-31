@@ -1,0 +1,300 @@
+{
+  "system_configuration": {
+    "environment_config": "./config/env_config.json",
+    "agent_config": "./config/agent_config.json",
+    "workspace_config": "./mdos.workspace.json",
+    "prompt_defaults": "./config/prompt_defaults.json",
+    "auto_wire_all": true,
+    "cross_config_references": true
+  },
+  "chat_prompts": {
+    "default_agent": "ag_admin",
+    "default_behavior": {
+      "use_skills": true,
+      "skill_first": true,
+      "agent_fallback": true
+    },
+    "entry_points": {
+      "all_prompts": {
+        "description": "Default configuration for all chat prompts",
+        "agent_id": "ag_admin",
+        "skills_enabled": true,
+        "skill_detection": true,
+        "auto_skill_selection": true,
+        "fallback_to_agent": true,
+        "context_sources": [
+          "projects.json",
+          "data/agents.json",
+          "docs",
+          "skills.json"
+        ],
+        "environment_integration": true,
+        "workspace_integration": true,
+        "config_aware": true
+      },
+      "project_admin": {
+        "description": "Auto orchestration flow for prompts that request project administration, coordination, or delegated execution",
+        "agent_id": "ag_admin",
+        "skills_enabled": true,
+        "skill_detection": true,
+        "auto_skill_selection": true,
+        "fallback_to_agent": true,
+        "auto_delegate_to_agents": true,
+        "auto_plan_tasks": true,
+        "auto_assign_tasks": true,
+        "collect_requirements_first": true,
+        "requirement_gathering": {
+          "enabled": true,
+          "must_collect": [
+            "goal",
+            "scope",
+            "constraints",
+            "acceptance_criteria",
+            "timeline"
+          ],
+          "stop_on_missing": true,
+          "ask_clarifying_questions": true
+        },
+        "prompt_aliases": [
+          "project admin",
+          "project-admin",
+          "admin",
+          "coordinate project",
+          "auto",
+          "plan",
+          "invent",
+          "full control",
+          "handover"
+        ],
+        "intent_detection": {
+          "enabled": true,
+          "intelligent_routing": true,
+          "full_control_handover": true,
+          "match_keywords": [
+            "auto",
+            "admin",
+            "plan",
+            "invent",
+            "handover",
+            "full control",
+            "orchestrate",
+            "coordinate"
+          ],
+          "route_to_entry_point": "project_admin"
+        },
+        "delegation_rules": {
+          "use_skills_first": true,
+          "delegate_to_specialists": true,
+          "preserve_context": true,
+          "escalate_when_needed": true
+        },
+        "execution_modes": {
+          "low_credit_efficient": {
+            "enabled": true,
+            "description": "Conserve credits by using concise plans, minimal retries, and lightweight delegation",
+            "max_depth": 2,
+            "prefer_skills": true,
+            "reduce_agent_chains": true
+          },
+          "full_power": {
+            "enabled": true,
+            "description": "Use maximum orchestration depth, deeper analysis, and broader delegation for high-value or high-complexity work",
+            "max_depth": 5,
+            "prefer_skills": false,
+            "enable_full_handover": true
+          }
+        },
+        "mode_switching": {
+          "enabled": true,
+          "auto_detect": true,
+          "keywords": {
+            "low_credit_efficient": [
+              "efficient",
+              "low credit",
+              "budget",
+              "cheap",
+              "light"
+            ],
+            "full_power": [
+              "full power",
+              "deep",
+              "full control",
+              "max",
+              "thorough"
+            ]
+          }
+        },
+        "intelligent_stack_selection": {
+          "enabled": true,
+          "infer_language": true,
+          "infer_environment": true,
+          "infer_tools": true,
+          "selection_rules": {
+            "react": {
+              "primary_agent": "ag_frontend",
+              "environment": "web",
+              "preferred_tools": [
+                "vite",
+                "react-dev-server"
+              ]
+            },
+            "nextjs": {
+              "primary_agent": "ag_frontend",
+              "environment": "web",
+              "preferred_tools": [
+                "nextjs",
+                "next-dev-server"
+              ]
+            },
+            "node": {
+              "primary_agent": "ag_backend",
+              "environment": "service",
+              "preferred_tools": [
+                "node",
+                "npm"
+              ]
+            },
+            "python": {
+              "primary_agent": "ag_backend",
+              "environment": "service",
+              "preferred_tools": [
+                "python",
+                "uvicorn"
+              ]
+            },
+            "docker": {
+              "primary_agent": "ag_devops",
+              "environment": "container",
+              "preferred_tools": [
+                "docker",
+                "docker-compose"
+              ]
+            },
+            "dev server": {
+              "primary_agent": "ag_frontend",
+              "environment": "local-dev",
+              "preferred_tools": [
+                "dev-server"
+              ]
+            }
+          }
+        },
+        "reuse_awareness": {
+          "enabled": true,
+          "detect_existing_ui": true,
+          "reuse_running_server": true,
+          "prefer_existing_runtime": true,
+          "selection_rules": {
+            "existing_ui": {
+              "primary_agent": "ag_frontend",
+              "action": "link_new_ui_to_existing_server",
+              "preferred_tools": [
+                "existing-server",
+                "shared-route"
+              ]
+            },
+            "same_server": {
+              "primary_agent": "ag_frontend",
+              "action": "reuse_current_runtime",
+              "preferred_tools": [
+                "existing-server",
+                "shared-host"
+              ]
+            }
+          }
+        },
+        "default_workflow": "wf_task",
+        "context_sources": [
+          "projects.json",
+          "data/agents.json",
+          "docs",
+          "skills.json",
+          "workflows.json"
+        ],
+        "environment_integration": true,
+        "workspace_integration": true,
+        "config_aware": true
+      }
+    }
+  },
+  "skills_configuration": {
+    "auto_detect": true,
+    "priority_order": [
+      "web-dev",
+      "skill-creator",
+      "pdf",
+      "xlsx"
+    ],
+    "fallback_skills": [
+      "general_purpose_task",
+      "search"
+    ],
+    "skill_context": {
+      "include_workspace": true,
+      "include_projects": true,
+      "include_agents": true
+    }
+  },
+  "agent_configuration": {
+    "project_admin": {
+      "agent_id": "ag_admin",
+      "default_for": [
+        "chat",
+        "planning",
+        "coordination"
+      ],
+      "permissions": [
+        "read:projects",
+        "write:tasks",
+        "assign:agents",
+        "use:skills"
+      ],
+      "context_sources": [
+        "projects.json",
+        "data/agents.json",
+        "docs",
+        "skills.json",
+        "workflows.json"
+      ]
+    }
+  },
+  "behavior_rules": {
+    "skill_first": "Always attempt to use relevant skills before falling back to general agent capabilities",
+    "agent_coordination": "Project admin agent coordinates with specialist agents when skills are not sufficient",
+    "context_awareness": "All interactions should consider project context, agent capabilities, and available skills",
+    "fallback_hierarchy": "Skills -> Project Admin Agent -> Specialist Agents -> General Purpose",
+    "project_admin_auto_flow": "Prompts such as 'project admin', 'auto', 'admin', 'plan', or 'invent' trigger automatic orchestration, task planning, and agent delegation without requiring manual routing; the system first gathers requirements and confirms scope before proceeding to full execution and full-control handover"
+  },
+  "workspace_integration": {
+    "enabled": true,
+    "workspace_file": "./mdos.workspace.json",
+    "project_context": true,
+    "agent_definitions": true,
+    "skill_definitions": true,
+    "workflow_definitions": true,
+    "knowledge_base": true,
+    "decision_records": true
+  },
+  "system_wiring": {
+    "all_configs_connected": true,
+    "cross_config_validation": true,
+    "entry_point_awareness": true,
+    "environment_integration": true,
+    "workspace_integration": true,
+    "agent_integration": true,
+    "skill_integration": true,
+    "prompt_integration": true
+  },
+  "entry_point_mappings": {
+    "environment": "env_config.json",
+    "agents": "agent_config.json",
+    "workspace": "mdos.workspace.json",
+    "prompts": "prompt_defaults.json",
+    "skills": "skills.json",
+    "projects": "projects.json",
+    "workflows": "workflows.json",
+    "knowledge": "knowledge.json",
+    "decisions": "decisions.json",
+    "tasks": "tasks.json"
+  }
+}

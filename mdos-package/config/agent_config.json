@@ -1,0 +1,291 @@
+{
+  "current_agent_id": "ag_admin",
+  "default_entry_point": "all_prompts",
+  "agents": {
+    "ag_admin": {
+      "display_name": "Project Administrator",
+      "model": "local-gpt",
+      "model_settings": {
+        "temperature": 0.2,
+        "max_tokens": 1024
+      },
+      "permissions": [
+        "read:projects",
+        "write:tasks",
+        "assign:agents",
+        "use:skills",
+        "manage:skills",
+        "coordinate:agents"
+      ],
+      "default_prompt": "You are the Project Administrator. Coordinate specialist agents and produce concise plans and tasks. For project-admin prompts, automatically create a plan, break work into tasks, and delegate to the most relevant specialist agents. Detect high-level intents such as 'auto', 'admin', 'plan', 'invent', or 'full control' and treat them as full orchestration requests that should hand off work intelligently. Also infer the likely language, environment, and tools from the prompt, such as React, Next.js, Node, Python, Docker, or a dev server, and select the appropriate stack and specialist agent accordingly. Always prefer using relevant skills when available, and coordinate with specialist agents when skills are not sufficient.",
+      "context_sources": [
+        "projects.json",
+        "data/agents.json",
+        "docs",
+        "skills.json",
+        "workflows.json"
+      ],
+      "skills_enabled": true,
+      "auto_skill_detection": true,
+      "skill_priority": "high",
+      "auto_delegate_tasks": true,
+      "automatic_delegation": true,
+      "collect_requirements_first": true,
+      "requirement_gathering": {
+        "enabled": true,
+        "must_collect": [
+          "goal",
+          "scope",
+          "constraints",
+          "acceptance_criteria",
+          "timeline"
+        ],
+        "stop_on_missing": true,
+        "ask_clarifying_questions": true
+      },
+      "delegation_rules": {
+        "use_skills_first": true,
+        "route_by_domain": true,
+        "preserve_context": true,
+        "create_tasks": true,
+        "assign_specialists": true
+      },
+      "default_flow": "project_admin",
+      "execution_modes": {
+        "low_credit_efficient": {
+          "enabled": true,
+          "description": "Use efficient routing and concise execution when credits are limited",
+          "max_depth": 2,
+          "prefer_skills": true,
+          "reduce_agent_chains": true
+        },
+        "full_power": {
+          "enabled": true,
+          "description": "Use comprehensive planning and deeper delegation for high-complexity work",
+          "max_depth": 5,
+          "prefer_skills": false,
+          "enable_full_handover": true
+        }
+      },
+      "mode_switching": {
+        "enabled": true,
+        "auto_detect": true,
+        "keywords": {
+          "low_credit_efficient": [
+            "efficient",
+            "low credit",
+            "budget",
+            "cheap",
+            "light"
+          ],
+          "full_power": [
+            "full power",
+            "deep",
+            "full control",
+            "max",
+            "thorough"
+          ]
+        }
+      },
+      "reuse_awareness": {
+        "enabled": true,
+        "detect_existing_ui": true,
+        "reuse_running_server": true,
+        "prefer_existing_runtime": true,
+        "selection_rules": {
+          "existing_ui": {
+            "primary_agent": "ag_frontend",
+            "action": "link_new_ui_to_existing_server",
+            "preferred_tools": [
+              "existing-server",
+              "shared-route"
+            ]
+          },
+          "same_server": {
+            "primary_agent": "ag_frontend",
+            "action": "reuse_current_runtime",
+            "preferred_tools": [
+              "existing-server",
+              "shared-host"
+            ]
+          }
+        }
+      },
+      "intelligent_intent_detection": {
+        "enabled": true,
+        "full_control_handover": true,
+        "keywords": [
+          "auto",
+          "admin",
+          "plan",
+          "invent",
+          "handover",
+          "full control",
+          "orchestrate"
+        ]
+      },
+      "intelligent_stack_selection": {
+        "enabled": true,
+        "infer_language": true,
+        "infer_environment": true,
+        "infer_tools": true,
+        "selection_rules": {
+          "react": {
+            "primary_agent": "ag_frontend",
+            "environment": "web",
+            "preferred_tools": [
+              "vite",
+              "react-dev-server"
+            ]
+          },
+          "nextjs": {
+            "primary_agent": "ag_frontend",
+            "environment": "web",
+            "preferred_tools": [
+              "nextjs",
+              "next-dev-server"
+            ]
+          },
+          "node": {
+            "primary_agent": "ag_backend",
+            "environment": "service",
+            "preferred_tools": [
+              "node",
+              "npm"
+            ]
+          },
+          "python": {
+            "primary_agent": "ag_backend",
+            "environment": "service",
+            "preferred_tools": [
+              "python",
+              "uvicorn"
+            ]
+          },
+          "docker": {
+            "primary_agent": "ag_devops",
+            "environment": "container",
+            "preferred_tools": [
+              "docker",
+              "docker-compose"
+            ]
+          },
+          "dev server": {
+            "primary_agent": "ag_frontend",
+            "environment": "local-dev",
+            "preferred_tools": [
+              "dev-server"
+            ]
+          }
+        }
+      }
+    },
+    "ag_plugin_architect": {
+      "display_name": "Plugin Architect",
+      "model": "local-gpt",
+      "model_settings": {
+        "temperature": 0.15,
+        "max_tokens": 1536
+      },
+      "permissions": [
+        "read:projects",
+        "write:docs",
+        "design:extensions",
+        "read:core",
+        "use:entry_points",
+        "access:workspace"
+      ],
+      "default_prompt": "You are the Momento Core Plugin Architect. Create a stable pluggable receiver design, plugin manifest schema, extension point contracts, and markdown implementation spec that fits the existing core architecture. Use entry points system for configuration and coordinate with project admin when needed.",
+      "context_sources": [
+        "projects.json",
+        "data/agents.json",
+        "docs",
+        "core/momento_core/plug_n_play/README.md",
+        "config/entry_points.json"
+      ],
+      "entry_point_enabled": true,
+      "entry_point_config": "./config/entry_points.json",
+      "coordinated_by": "ag_admin"
+    }
+  },
+  "skills": {
+    "enabled": true,
+    "auto_detect": true,
+    "default_behavior": "skill_first",
+    "skill_context": {
+      "include_workspace": true,
+      "include_projects": true,
+      "include_agents": true,
+      "include_workflows": true
+    },
+    "fallback_strategy": {
+      "hierarchy": [
+        "skills",
+        "project_admin",
+        "specialist_agents",
+        "general_purpose"
+      ],
+      "agent_coordination": true
+    }
+  },
+  "entry_points": {
+    "system_enabled": true,
+    "master_config": "./config/entry_points.json",
+    "chat_prompts": {
+      "default": "all_prompts",
+      "configurations": {
+        "all_prompts": {
+          "agent_id": "ag_admin",
+          "skills_enabled": true,
+          "skill_priority": "high",
+          "auto_skill_selection": true,
+          "agent_coordination": true,
+          "auto_delegate_to_agents": true,
+          "project_admin_primary": true,
+          "auto_plan_and_assign": true,
+          "context_sources": [
+            "projects.json",
+            "data/agents.json",
+            "docs",
+            "skills.json",
+            "workflows.json"
+          ]
+        },
+        "project_admin": {
+          "agent_id": "ag_admin",
+          "skills_enabled": true,
+          "skill_priority": "high",
+          "auto_skill_selection": true,
+          "agent_coordination": true,
+          "auto_delegate_to_agents": true,
+          "auto_plan_and_assign": true,
+          "collect_requirements_first": true,
+          "default_workflow": "wf_task",
+          "context_sources": [
+            "projects.json",
+            "data/agents.json",
+            "docs",
+            "skills.json",
+            "workflows.json"
+          ]
+        }
+      }
+    },
+    "agent_wiring": {
+      "all_agents_entry_point_aware": true,
+      "coordinated_by_ag_admin": true,
+      "cross_agent_communication": true,
+      "entry_point_config_access": true,
+      "workspace_integration": true,
+      "environment_integration": true
+    },
+    "system_integration": {
+      "environment_config": "./config/env_config.json",
+      "workspace_config": "./mdos.workspace.json",
+      "prompt_defaults": "./config/prompt_defaults.json",
+      "all_configs_wired": true,
+      "cross_config_validation": true,
+      "unified_entry_point_system": true
+    }
+  }
+}

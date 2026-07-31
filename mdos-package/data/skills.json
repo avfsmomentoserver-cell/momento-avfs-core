@@ -1,0 +1,67 @@
+[
+  {
+    "id": "sk_fastapi",
+    "name": "FastAPI",
+    "description": "Async Python web framework for the backend API and SSE.",
+    "related": [
+      "Python",
+      "SQLAlchemy",
+      "WebSockets"
+    ]
+  },
+  {
+    "id": "sk_react",
+    "name": "React + TypeScript",
+    "description": "Component UI for dashboards and consumer apps.",
+    "related": [
+      "Vite",
+      "React Query",
+      "Tailwind"
+    ]
+  },
+  {
+    "id": "sk_playwright",
+    "name": "Playwright",
+    "description": "Browser automation for the collector (headed/headless).",
+    "related": [
+      "Collector",
+      "Chromium"
+    ]
+  },
+  {
+    "id": "sk_forecast",
+    "name": "Forecast Engineering",
+    "description": "Feature extraction, pattern analysis, confidence scoring, forecasting.",
+    "related": [
+      "Statistics",
+      "Data Collection"
+    ]
+  },
+  {
+    "id": "sk_sqlite",
+    "name": "SQLite",
+    "description": "Local-first persistence with migration path to Supabase.",
+    "related": [
+      "SQLAlchemy",
+      "Migrations"
+    ]
+  },
+  {
+    "id": "sk_testing",
+    "name": "Testing",
+    "description": "Unit, integration, replay, historical, and live validation.",
+    "related": [
+      "QA",
+      "CI"
+    ]
+  },
+  {
+    "id": "sk_docs",
+    "name": "Documentation",
+    "description": "Structured, versioned, cross-referenced engineering docs.",
+    "related": [
+      "Markdown",
+      "Knowledge Base"
+    ]
+  }
+]

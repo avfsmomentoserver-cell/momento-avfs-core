@@ -1,0 +1,531 @@
+{
+  "meta": {
+    "name": "MDOS Workspace",
+    "version": "1.0.0",
+    "generatedAt": "2026-07-19T05:26:23.243Z",
+    "description": "Meta Development Operating System — a project-agnostic engineering OS, seeded with the Momento platform.",
+    "entry_point_system": {
+      "enabled": true,
+      "configuration_files": [
+        "config/agent_config.json",
+        "config/env_config.json",
+        "config/entry_points.json",
+        "config/prompt_defaults.json",
+        "config/master_wiring.json"
+      ],
+      "default_agent": "ag_admin",
+      "skill_first": true,
+      "unified_behavior": true
+    }
+  },
+  "projects": [
+    {
+      "id": "prj_momento",
+      "name": "Momento Core Platform",
+      "description": "Modular analytics and forecasting platform that collects, processes, analyzes, forecasts, and visualizes event streams in real time.",
+      "mission": "Transform sequential event data into explainable, continuously improving intelligence.",
+      "vision": "A stable forecasting core consumed by apps, dashboards, and future AI agents — not trapped inside a single application.",
+      "status": "Active",
+      "stack": [
+        "FastAPI",
+        "SQLAlchemy",
+        "SQLite",
+        "WebSockets",
+        "Playwright",
+        "React",
+        "TypeScript",
+        "Vite"
+      ],
+      "goals": [
+        "Protect the Kernel (Round Event Model, contracts, runtime, event bus)",
+        "Rebuild collection into independent services",
+        "Evolve the intelligence layer into replaceable engines",
+        "Ship Admin + Consumer applications"
+      ],
+      "milestones": [
+        {
+          "title": "Phase 1 — Protect the Kernel",
+          "status": "doing"
+        },
+        {
+          "title": "Phase 2 — Rebuild Collection Architecture",
+          "status": "todo"
+        },
+        {
+          "title": "Phase 3 — Intelligence Layer Evolution",
+          "status": "todo"
+        },
+        {
+          "title": "Phase 4 — Platform Applications",
+          "status": "todo"
+        }
+      ]
+    }
+  ],
+  "knowledge": [
+    {
+      "id": "kn_obs",
+      "title": "Observation Before Prediction",
+      "type": "Concept",
+      "summary": "Understand the present before reasoning about the future. Prediction without understanding is speculation.",
+      "tags": [
+        "philosophy",
+        "pipeline"
+      ],
+      "projectId": "prj_momento"
+    },
+    {
+      "id": "kn_kernel",
+      "title": "Momento Kernel",
+      "type": "Architecture",
+      "summary": "Stable foundation: Round Event Model, database layer, schema contracts, runtime, event bus, API contracts, engine registry.",
+      "tags": [
+        "kernel",
+        "core"
+      ],
+      "projectId": "prj_momento"
+    },
+    {
+      "id": "kn_immutable",
+      "title": "Immutable Raw Events",
+      "type": "Standard",
+      "summary": "Raw data is never edited. Corrections recorded separately. Enables replay, auditing, calibration, learning.",
+      "tags": [
+        "truth",
+        "data"
+      ],
+      "projectId": "prj_momento"
+    },
+    {
+      "id": "kn_engines",
+      "title": "Intelligence Engine Chain",
+      "type": "Pattern",
+      "summary": "Pattern -> DNA -> Similarity -> Probability -> Confidence -> Forecast. Each replaceable with clear contracts.",
+      "tags": [
+        "forecast",
+        "engines"
+      ],
+      "projectId": "prj_momento"
+    },
+    {
+      "id": "kn_explain",
+      "title": "Explainability Metadata",
+      "type": "Standard",
+      "summary": "Every prediction states inputs used, patterns detected, conclusion reasoning, confidence, and uncertainty drivers.",
+      "tags": [
+        "explainability"
+      ],
+      "projectId": "prj_momento"
+    },
+    {
+      "id": "kn_localprod",
+      "title": "Local vs Production Independence",
+      "type": "Standard",
+      "summary": "SQLite/local dev must always keep working when cloud (Vercel/Render/Supabase) support is added.",
+      "tags": [
+        "devops",
+        "config"
+      ],
+      "projectId": "prj_momento"
+    }
+  ],
+  "agents": [
+    {
+      "id": "ag_admin",
+      "name": "Project Administrator",
+      "role": "Orchestration",
+      "purpose": "Understand project state and coordinate specialist agents to advance milestones.",
+      "responsibilities": [
+        "Read architecture & roadmap",
+        "Generate implementation plans",
+        "Break work into tasks",
+        "Assign to specialists",
+        "Track blockers",
+        "Coordinate validation",
+        "Manage entry point system",
+        "Coordinate skill usage",
+        "Ensure unified configuration behavior"
+      ],
+      "boundaries": "Coordinates work; never silently modifies unrelated parts of the system.",
+      "entry_point_config": {
+        "default_for": "all_prompts",
+        "skills_first": true,
+        "coordinates_all_agents": true,
+        "manages_entry_points": true,
+        "configuration_files": [
+          "config/agent_config.json",
+          "config/entry_points.json",
+          "config/prompt_defaults.json"
+        ]
+      }
+    },
+    {
+      "id": "ag_arch",
+      "name": "System Architect",
+      "role": "Architecture",
+      "purpose": "Design future architecture, find weaknesses, create migration strategies.",
+      "responsibilities": [
+        "Review existing architecture",
+        "Design contracts",
+        "Produce ADRs",
+        "Review major changes"
+      ],
+      "boundaries": "Architecture over short-term convenience.",
+      "entry_point_config": {
+        "coordinated_by": "ag_admin",
+        "entry_point_aware": true,
+        "access_to_config_files": true
+      }
+    },
+    {
+      "id": "ag_backend",
+      "name": "Backend Engineer",
+      "role": "Implementation",
+      "purpose": "Implement REST APIs, SSE, services, and business logic.",
+      "responsibilities": [
+        "FastAPI endpoints",
+        "Services",
+        "WebSockets",
+        "Business logic"
+      ],
+      "boundaries": "Preserve existing event contracts."
+    },
+    {
+      "id": "ag_frontend",
+      "name": "Frontend Engineer",
+      "role": "Implementation",
+      "purpose": "Build interfaces and visualizations.",
+      "responsibilities": [
+        "Dashboards",
+        "Charts",
+        "Real-time UI"
+      ],
+      "boundaries": "Match reference UX; replace mock data with real APIs."
+    },
+    {
+      "id": "ag_db",
+      "name": "Database Engineer",
+      "role": "Data",
+      "purpose": "Maintain storage, migrations, and optimization.",
+      "responsibilities": [
+        "Schema",
+        "Migrations",
+        "Indexing"
+      ],
+      "boundaries": "Never edit historical truth."
+    },
+    {
+      "id": "ag_collector",
+      "name": "Collector Engineer",
+      "role": "Collection",
+      "purpose": "Maintain browser automation and ingestion.",
+      "responsibilities": [
+        "Playwright collectors",
+        "Validation",
+        "Deduplication",
+        "Heartbeat/reconnect"
+      ],
+      "boundaries": "All external data passes through observation."
+    },
+    {
+      "id": "ag_forecast",
+      "name": "Forecast Engineer",
+      "role": "Intelligence",
+      "purpose": "Improve prediction logic with measurable outputs.",
+      "responsibilities": [
+        "Feature extraction",
+        "Pattern analysis",
+        "Confidence scoring"
+      ],
+      "boundaries": "No prediction without explanation."
+    },
+    {
+      "id": "ag_devops",
+      "name": "DevOps Engineer",
+      "role": "Operations",
+      "purpose": "Handle deployment across local and cloud.",
+      "responsibilities": [
+        "Vercel/Render/Supabase",
+        "CI",
+        "Config"
+      ],
+      "boundaries": "Keep environments independent."
+    },
+    {
+      "id": "ag_docs",
+      "name": "Documentation Engineer",
+      "role": "Docs",
+      "purpose": "Keep documentation current and generated from structured data.",
+      "responsibilities": [
+        "MES docs",
+        "Backlinks",
+        "Review workflows"
+      ],
+      "boundaries": "No duplicate knowledge."
+    },
+    {
+      "id": "ag_qa",
+      "name": "QA Engineer",
+      "role": "Quality",
+      "purpose": "Prove reliability with tests.",
+      "responsibilities": [
+        "Unit",
+        "Integration",
+        "Replay",
+        "Historical",
+        "Live verification"
+      ],
+      "boundaries": "Definition of Done gate."
+    },
+    {
+      "id": "ag_mentor",
+      "name": "System Mentor",
+      "role": "Teaching",
+      "purpose": "Teach the owner every subsystem in four layers: simple, technical, engineering, future.",
+      "responsibilities": [
+        "Explain files & architecture",
+        "Use real-world analogies",
+        "Never assume knowledge",
+        "Produce diagrams"
+      ],
+      "boundaries": "Teacher first, engineer second, coder third."
+    }
+  ],
+  "skills": [
+    {
+      "id": "sk_fastapi",
+      "name": "FastAPI",
+      "description": "Async Python web framework for the backend API and SSE.",
+      "related": [
+        "Python",
+        "SQLAlchemy",
+        "WebSockets"
+      ],
+      "entry_point_config": {
+        "auto_detect": true,
+        "coordinated_by": "ag_admin",
+        "skill_first": true
+      }
+    },
+    {
+      "id": "sk_react",
+      "name": "React + TypeScript",
+      "description": "Component UI for dashboards and consumer apps.",
+      "related": [
+        "Vite",
+        "React Query",
+        "Tailwind"
+      ]
+    },
+    {
+      "id": "sk_playwright",
+      "name": "Playwright",
+      "description": "Browser automation for the collector (headed/headless).",
+      "related": [
+        "Collector",
+        "Chromium"
+      ]
+    },
+    {
+      "id": "sk_forecast",
+      "name": "Forecast Engineering",
+      "description": "Feature extraction, pattern analysis, confidence scoring, forecasting.",
+      "related": [
+        "Statistics",
+        "Data Collection"
+      ]
+    },
+    {
+      "id": "sk_sqlite",
+      "name": "SQLite",
+      "description": "Local-first persistence with migration path to Supabase.",
+      "related": [
+        "SQLAlchemy",
+        "Migrations"
+      ]
+    },
+    {
+      "id": "sk_testing",
+      "name": "Testing",
+      "description": "Unit, integration, replay, historical, and live validation.",
+      "related": [
+        "QA",
+        "CI"
+      ]
+    },
+    {
+      "id": "sk_docs",
+      "name": "Documentation",
+      "description": "Structured, versioned, cross-referenced engineering docs.",
+      "related": [
+        "Markdown",
+        "Knowledge Base"
+      ]
+    }
+  ],
+  "workflows": [
+    {
+      "id": "wf_task",
+      "name": "Standard Task",
+      "stages": [
+        "Understand",
+        "Design",
+        "Implement",
+        "Test",
+        "Document",
+        "Review"
+      ],
+      "outputs": "Working, tested, documented change that preserves compatibility.",
+      "entry_point_config": {
+        "coordinated_by": "ag_admin",
+        "uses_skills": true,
+        "entry_point_aware": true
+      }
+    },
+    {
+      "id": "wf_feature",
+      "name": "New Feature",
+      "stages": [
+        "Purpose",
+        "Necessity",
+        "Separation",
+        "Measurement",
+        "Evolution",
+        "Implement"
+      ],
+      "outputs": "Approved feature that fits Core or lives as an extension."
+    },
+    {
+      "id": "wf_arch",
+      "name": "Architecture Review",
+      "stages": [
+        "Read current",
+        "Find weaknesses",
+        "Design target",
+        "ADR",
+        "Migration plan"
+      ],
+      "outputs": "Accepted ADR and migration strategy."
+    },
+    {
+      "id": "wf_deploy",
+      "name": "Deployment",
+      "stages": [
+        "Build",
+        "Validate",
+        "Stage",
+        "Promote",
+        "Monitor"
+      ],
+      "outputs": "Reproducible deploy across local and cloud."
+    }
+  ],
+  "decisions": [
+    {
+      "id": "adr_001",
+      "code": "ADR-001",
+      "title": "Momento is a Prediction Intelligence Platform",
+      "decision": "Designed as an intelligence platform rather than a single prediction algorithm.",
+      "reason": "Algorithms evolve. Intelligence architecture must survive.",
+      "status": "Draft",
+      "entry_point_config": {
+        "referenced_by": "ag_admin",
+        "entry_point_aware": true,
+        "configuration_impact": true
+      }
+    },
+    {
+      "id": "adr_002",
+      "code": "ADR-002",
+      "title": "Raw Events Are Immutable",
+      "decision": "Historical observations cannot be modified.",
+      "reason": "Replayability and trust require permanent historical truth.",
+      "status": "Draft"
+    },
+    {
+      "id": "adr_003",
+      "code": "ADR-003",
+      "title": "Observation Engine Is the Entry Point",
+      "decision": "All external data must pass through observation processing.",
+      "reason": "Separates collection from intelligence.",
+      "status": "Draft"
+    },
+    {
+      "id": "adr_004",
+      "code": "ADR-004",
+      "title": "Explainability Is Mandatory",
+      "decision": "No prediction exists without explanation metadata.",
+      "reason": "Trust and learning require transparency.",
+      "status": "Draft"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "t1",
+      "title": "Define Round Event Model & schema contracts",
+      "agentId": "ag_arch",
+      "projectId": "prj_momento",
+      "priority": "high",
+      "status": "doing"
+    },
+    {
+      "id": "t2",
+      "title": "Implement Collector heartbeat + reconnect",
+      "agentId": "ag_collector",
+      "projectId": "prj_momento",
+      "priority": "high",
+      "status": "todo"
+    },
+    {
+      "id": "t3",
+      "title": "Build /rounds, /rounds/latest, /rounds/history APIs",
+      "agentId": "ag_backend",
+      "projectId": "prj_momento",
+      "priority": "medium",
+      "status": "todo"
+    },
+    {
+      "id": "t4",
+      "title": "Forecast card with confidence + explanation",
+      "agentId": "ag_forecast",
+      "projectId": "prj_momento",
+      "priority": "medium",
+      "status": "todo"
+    },
+    {
+      "id": "t5",
+      "title": "Write replay tests for immutable events",
+      "agentId": "ag_qa",
+      "projectId": "prj_momento",
+      "priority": "medium",
+      "status": "todo"
+    }
+  ],
+  "docs": [
+    {
+      "path": "docs/MES/00_Momento_Constitution.md",
+      "title": "Momento Constitution",
+      "body": "# Momento Constitution\n\n| Field | Value |\n|---|---|\n| Project | Momento Core Platform |\n| Document | Momento Constitution |\n| Version | 2.0 |\n| Status | Draft |\n| Authority | Highest Design Authority |\n\n## 1. Purpose\n\nThe Momento Constitution defines the permanent principles governing the design,\ndevelopment, operation, and evolution of the Momento platform. Every future\nfeature, engine, module, API, visualization, AI model, and data process must\nsupport the original mission of Momento.\n\nIt prevents architectural drift, unnecessary complexity, unexplainable\nintelligence, domain lock-in, and unreliable conclusions.\n\n## 2. Mission\n\nMomento exists to transform sequential event data into explainable, continuously\nimproving intelligence. The platform observes reality, converts observations into\nstructured knowledge, discovers patterns, generates intelligence, and learns from\noutcomes.\n\n## 3. Core Philosophy — Observation Before Prediction\n\n    Observation -> Validation -> Structured Events -> Features -> Knowledge -> Intelligence -> Prediction\n\nPrediction without understanding is speculation.\n\n## 4. The Twelve Articles of Momento\n\n- **I — Purpose**: Every component must contribute to explainable intelligence.\n- **II — Truth**: Raw observations are immutable; corrections are recorded separately.\n- **III — Observation**: All intelligence begins with observation; no engine consumes uncontrolled external data.\n- **IV — Knowledge**: Momento reasons from knowledge (features, states, patterns), not raw events.\n- **V — Explainability**: Every intelligence output must have a reason and confidence.\n- **VI — Learning**: Every resolved outcome improves future intelligence.\n- **VII — Visualization**: Visualization is an intelligence interface, not decoration.\n- **VIII — Modularity**: Core stays independent from individual domains.\n- **IX — Extensibility**: New capabilities are added through extensions; Core stays stable.\n- **X — Validation**: Every subsystem must prove reliability (unit, integration, replay, historical, live).\n- **XI — Human-Centered Intelligence**: Momento reduces cognitive load.\n- **XII — Evolution**: Momento evolves while preserving reproducibility and backward compatibility.\n\n## 5. Feature Approval Framework\n\nBefore adding anything, answer: Purpose, Necessity, Separation, Measurement, Evolution.\n\n## 6. Architecture Decision Records\n\n- **ADR-001** — Momento is a Prediction Intelligence Platform (not a single algorithm).\n- **ADR-002** — Raw Events Are Immutable.\n- **ADR-003** — Observation Engine Is the Entry Point.\n- **ADR-004** — Explainability Is Mandatory.\n\nStatus: Draft Review. Next: 01_Vision_and_Product_Definition.md\n"
+    },
+    {
+      "path": "docs/MES/01_Vision_and_Product_Definition.md",
+      "title": "Vision & Product Definition",
+      "body": "# Vision and Product Definition\n\n| Field | Value |\n|---|---|\n| Document | 01_Vision_and_Product_Definition |\n| Version | 2.0 |\n| Status | Draft |\n\n## What Momento Is\n\nMomento is a modular analytics and forecasting platform that collects, processes,\nanalyzes, forecasts, and visualizes event streams in real time. It is a prediction\n**intelligence platform**, not a single prediction algorithm.\n\n## Who It Serves\n\n- Operators who need live monitoring and system control (Admin Platform).\n- End users who want an explainable prediction experience (Consumer Application).\n- Future AI agents and dashboards that consume a stable forecasting core.\n\n## What It Does\n\nObserve event streams, structure them into knowledge, detect patterns, produce\nexplainable forecasts with confidence, and learn continuously from outcomes.\n\n## What It Does Not Do\n\nMomento does not trap intelligence inside a single application, edit raw history,\nor produce predictions without explanations.\n\n## Long-Term Direction\n\n    Momento Core Backend\n            | API\n    Applications (Admin, Consumer, Mobile, Future Agents)\n\nBuild the intelligence platform first. Build the beautiful experience second.\n\n## Success Criteria\n\nReproducible forecasts, measurable engine outputs, explainable predictions,\nbackward-compatible evolution, and a Core that outlives any single algorithm.\n"
+    },
+    {
+      "path": "docs/MES/03_Platform_Architecture.md",
+      "title": "Platform Architecture",
+      "body": "# Platform Architecture\n\n| Field | Value |\n|---|---|\n| Document | 03_Platform_Architecture |\n| Version | 2.0 |\n| Status | Draft |\n\n## Module Pipeline\n\n    Collector -> Backend API -> Analysis -> Forecast Engine -> Database -> Dashboard\n\nEach module has a single responsibility.\n\n## The Momento Kernel (Phase 1 — Protect the Kernel)\n\n    Round Event Model | Database Layer | Schema Contracts | Runtime\n    Event Bus | API Contracts | Engine Registry\n\n## Collection Architecture (Phase 2)\n\n    Browser Collector | WebSocket Collector | CSV Import Collector\n        -> Normalizer -> Event Bus -> Core Database\n\n## Intelligence Layer (Phase 3)\n\n    Pattern Engine -> DNA Engine -> Similarity Engine\n        -> Probability Engine -> Confidence Engine -> Forecast Engine\n\nEach engine has clear contracts, is independently tested, replaceable, and\nproduces measurable outputs.\n\n## Platform Applications (Phase 4)\n\n- **Admin Platform** — live monitoring, collector status, engine health, calibration, data explorer.\n- **Consumer Application** — auth, subscription, forecast display, confidence indicators, history.\n\n## Local vs Production\n\n- Local: SQLite, local API, local dashboard — fast development.\n- Production: Vercel, Render, Supabase, cloud collector.\n- Never remove local functionality when adding production support.\n"
+    },
+    {
+      "path": "docs/MDOS/00_Overview.md",
+      "title": "MDOS Overview",
+      "body": "# MDOS — Meta Development Operating System\n\nMDOS is a complete Engineering Operating System that enables humans and AI agents\nto collaboratively design, build, validate, document, and evolve complex software\nsystems. It is project-agnostic: Momento is the first project running on it.\n\n## Core Philosophy\n\n- Knowledge is the source of truth.\n- Projects are generated from knowledge; tasks from projects; agents execute tasks.\n- Validation verifies results; documentation updates after approved work.\n- No duplicate knowledge. Everything references everything. Everything is searchable and versioned.\n\n## Modules\n\nDashboard, Projects, Knowledge Base, Architecture, Agents, Skills, Tasks,\nRoadmaps, Workflows, Templates, Decision Records, Testing, Validation, Search,\nSettings, Activity, Notifications, Repositories, Integrations, Documentation,\nAnalytics.\n\nEach module is independently extensible.\n\n## Portability\n\nThe entire workspace serializes to `mdos.workspace.json`. Import it into any MDOS\ninstance to restore all projects, knowledge, agents, skills, workflows, decisions,\ntasks, and documents. This package is that export.\n"
+    },
+    {
+      "path": "DEPLOY.md",
+      "title": "Deploy Guide",
+      "body": "# Deploy MDOS\n\nThis package is a self-contained, importable MDOS workspace.\n\n## Quick Deploy (static web)\n\n```bash\nbun install\nbun run build\n# outputs ./dist — deploy to any static host\n```\n\n## Deploy to Vercel\n\n```bash\nnpm i -g vercel\nvercel --prod\n```\n\n## Deploy to Netlify\n\n```bash\nnpm i -g netlify-cli\nnetlify deploy --prod --dir=dist\n```\n\n## Import the workspace\n\nOpen MDOS and use **IMPORT** to load `mdos.workspace.json`. This restores the\nfull Momento seed (Constitution, Articles, ADRs, agents, skills, workflows).\n"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+[Unit]
+Description=Momento Core / AVFS Ingest Receiver
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=momento
+Group=momento
+WorkingDirectory=/opt/momento/backend
+Environment=MOMENTO_WATCH_DOWNLOADS=true
+Environment=MOMENTO_DOWNLOADS_DIR=/home/pirates/Downloads
+Environment=MOMENTO_WATCHER_ENABLED=false
+Environment=MOMENTO_FEED_AUTOSTART=false
+Environment=MOMENTO_DATA_DIR=/opt/momento/backend/data
+ExecStart=/opt/momento/backend/.venv/bin/python run_api.py --receiver-only
+Restart=always
+RestartSec=5
+
+NoNewPrivileges=true
+ProtectSystem=full
+ReadWritePaths=/var/lib/momento /var/log/momento /home/pirates/Downloads
+MemoryLimit=512M
+
+StandardOutput=append:/var/log/momento/receiver.log
+StandardError=append:/var/log/momento/receiver.err
+
+[Install]
+WantedBy=multi-user.target

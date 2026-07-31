@@ -1,0 +1,27 @@
+node_modules
+.env
+.expo
+.rork
+
+# Python backend
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Backend runtime state (created on first boot)
+backend/data/
+backend/logs/
+*.db
+*.db-wal
+*.db-shm
+
+# Generated download bundles — regenerate with scripts/build_bundles.py
+downloads/*.zip
+
+# Build output
+dist/
+build/
+
+# GitHub tokens
+token_github_*

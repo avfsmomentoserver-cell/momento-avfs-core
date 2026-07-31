@@ -1,0 +1,47 @@
+{
+  "project": {
+    "name": "Momento Core Platform",
+    "description": "Modular analytics and forecasting platform that collects, processes, analyzes, forecasts, and visualizes event streams in real time.",
+    "version": "4.0.0"
+  },
+  "default_agent": "ag_admin",
+  "entry_point_system": {
+    "enabled": true,
+    "default_entry_point": "all_prompts",
+    "skills_first": true,
+    "agent_coordination": true
+  },
+  "agents_config": "./AGENTS.md",
+  "skills_directory": "./skills/",
+  "workflows_directory": "./workflows/",
+  "coding_standards": "./CODING_STANDARDS.md",
+  "behavior": {
+    "fallback_hierarchy": [
+      "skills",
+      "project_admin",
+      "specialist_agents",
+      "general_purpose"
+    ],
+    "auto_skill_detection": true,
+    "collect_requirements_first": true,
+    "requirement_fields": [
+      "goal",
+      "scope",
+      "constraints",
+      "acceptance_criteria",
+      "timeline"
+    ]
+  },
+  "execution_modes": {
+    "low_credit_efficient": {
+      "keywords": ["efficient", "low credit", "budget", "cheap", "light"],
+      "max_depth": 2,
+      "prefer_skills": true
+    },
+    "full_power": {
+      "keywords": ["full power", "deep", "full control", "max", "thorough"],
+      "max_depth": 5,
+      "enable_full_handover": true
+    }
+  }
+}

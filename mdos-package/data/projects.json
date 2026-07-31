@@ -1,0 +1,44 @@
+[
+  {
+    "id": "prj_momento",
+    "name": "Momento Core Platform",
+    "description": "Modular analytics and forecasting platform that collects, processes, analyzes, forecasts, and visualizes event streams in real time.",
+    "mission": "Transform sequential event data into explainable, continuously improving intelligence.",
+    "vision": "A stable forecasting core consumed by apps, dashboards, and future AI agents — not trapped inside a single application.",
+    "status": "Active",
+    "stack": [
+      "FastAPI",
+      "SQLAlchemy",
+      "SQLite",
+      "WebSockets",
+      "Playwright",
+      "React",
+      "TypeScript",
+      "Vite"
+    ],
+    "goals": [
+      "Protect the Kernel (Round Event Model, contracts, runtime, event bus)",
+      "Rebuild collection into independent services",
+      "Evolve the intelligence layer into replaceable engines",
+      "Ship Admin + Consumer applications"
+    ],
+    "milestones": [
+      {
+        "title": "Phase 1 — Protect the Kernel",
+        "status": "doing"
+      },
+      {
+        "title": "Phase 2 — Rebuild Collection Architecture",
+        "status": "todo"
+      },
+      {
+        "title": "Phase 3 — Intelligence Layer Evolution",
+        "status": "todo"
+      },
+      {
+        "title": "Phase 4 — Platform Applications",
+        "status": "todo"
+      }
+    ]
+  }
+]

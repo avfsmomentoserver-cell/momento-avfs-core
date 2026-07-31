@@ -1,0 +1,1589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PointFX Engine - Market View</title>
+<script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+:root{
+  --bg:#0b0b0f;--panel:#13131a;--border:#1e1e2e;
+  --accent:#7c3aed;--green:#22c55e;--red:#ef4444;
+  --gold:#f59e0b;--blue:#38bdf8;
+  --text:#dde1f0;--muted:#4a5070;--dim:#8891b0;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:13px;display:flex;flex-direction:column;min-height:100vh;height:auto;overflow-x:hidden;overflow-y:auto}
+
+/* Nav */
+nav{display:flex;align-items:center;gap:12px;padding:8px 16px;background:var(--panel);border-bottom:1px solid var(--border)}
+nav h1{font-size:14px;font-weight:700;color:var(--accent);letter-spacing:.5px}
+nav .menu{display:flex;gap:8px;margin-left:auto}
+nav .menu a{padding:6px 12px;background:none;border:1px solid var(--border);color:var(--dim);text-decoration:none;border-radius:4px;font-size:11px;transition:all .2s}
+nav .menu a:hover,nav .menu a.active{border-color:var(--accent);color:var(--accent)}
+.source-switcher{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-left:8px}
+.source-switcher .btn{padding:5px 8px;font-size:10px}
+.source-switcher .btn.active{border-color:var(--accent);color:var(--accent)}
+.dot{width:8px;height:8px;border-radius:50%;margin-right:4px}
+.dot.on{background:var(--green);box-shadow:0 0 6px var(--green)}
+.dot.off{background:var(--red)}
+
+/* Layout */
+.main{display:grid;grid-template-columns:var(--left-w,260px) 1fr var(--right-w,220px);flex:1;min-height:0;overflow:visible;transition:grid-template-columns .2s}
+.col{display:flex;flex-direction:column;border-right:1px solid var(--border);overflow:visible;transition:width .2s,min-width .2s}
+.col:last-child{border-right:none}
+/* Collapsed side panes */
+.col.collapsed{overflow:hidden}
+.col.collapsed .pane,.col.collapsed .pane.grow{display:none}
+.col-toggle{background:none;border:none;color:var(--dim);cursor:pointer;font-size:13px;padding:2px 6px;border-radius:3px;flex-shrink:0;transition:color .2s}
+.col-toggle:hover{color:var(--accent)}
+
+/* Panel */
+.pane{padding:12px;border-bottom:1px solid var(--border)}
+.pane.grow{flex:1;overflow-y:auto}
+.pt{font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px;font-weight:600}
+
+/* Chart */
+#chart{flex:1;position:relative;background:var(--bg)}
+
+/* Stats */
+.stat{display:flex;justify-content:space-between;margin-bottom:6px;font-size:11px}
+.stat .label{color:var(--dim)}
+.stat .value{color:var(--text);font-weight:600;font-family:'Fira Code',monospace}
+.stat .value.up{color:var(--green)}
+.stat .value.down{color:var(--red)}
+
+/* Round feed */
+.round{display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #111118;font-size:11px}
+.round .mult{font-family:'Fira Code',monospace;font-weight:700;min-width:55px}
+.round .pts{color:var(--gold);min-width:45px}
+.round .pts.neg{color:var(--red)}
+.round .pts.pos{color:var(--green)}
+.round .time{color:var(--muted);font-size:9px;margin-left:auto}
+
+/* Controls */
+.ctrl{display:flex;gap:8px;margin-top:8px}
+.btn{padding:6px 12px;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:4px;cursor:pointer;font-size:11px;transition:all .2s}
+.btn:hover{border-color:var(--accent);background:var(--accent);color:#000}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#000}
+
+/* Timeframe */
+.tf{display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap}
+.tf button{padding:4px 8px;background:var(--panel);border:1px solid var(--border);color:var(--dim);border-radius:4px;cursor:pointer;font-size:10px}
+.tf button.active{border-color:var(--accent);color:var(--accent)}
+
+/* Tabs */
+.tabs{display:flex;gap:4px;margin-bottom:8px;border-bottom:1px solid var(--border)}
+.tabs button{padding:6px 12px;background:none;border:none;border-bottom:2px solid transparent;color:var(--dim);cursor:pointer;font-size:11px;transition:all .2s}
+.tabs button.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tabs button:hover{color:var(--text)}
+
+/* Tab content */
+.tab-content{display:none;flex:1;position:relative;overflow:visible;min-height:0}
+.tab-content.active{display:flex;flex-direction:column;min-height:0}
+
+/* Ladder viz */
+.ladder-viz{padding:12px;overflow-y:auto}
+.ladder-box{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:8px;margin-bottom:8px}
+.ladder-box.active{border-color:var(--green);background:#0a2010}
+.ladder-box.fizzle{border-color:var(--red);background:#2a0a0a}
+.ladder-title{font-size:10px;color:var(--muted);margin-bottom:4px;text-transform:uppercase}
+.ladder-stat{display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px}
+.ladder-stat .label{color:var(--dim)}
+.ladder-stat .value{color:var(--text);font-weight:600}
+.stars{color:var(--gold);font-size:9px}
+.resistance-list{margin-top:6px;font-size:9px}
+.resistance-item{padding:2px 0;border-bottom:1px solid #111118;color:var(--dim)}
+.resistance-item.strong{color:var(--gold);font-weight:600}
+
+/* Market state */
+.badge{display:inline-block;padding:4px 10px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase}
+.badge.compression{background:#1a0a2a;color:#c084fc}
+.badge.expansion{background:#0a2010;color:#4ade80}
+.badge.normal{background:#1a1a2e;color:#818cf8}
+</style>
+<script src="game-context/game-source.js"></script>
+</head>
+<body>
+
+<nav>
+  <div class="dot on"></div>
+  <h1>AVFS</h1>
+  <span style="font-size:10px;color:var(--muted)">Market Analysis & Signals</span>
+  <button class="col-toggle" id="toggle-left"  title="Toggle left panel"  onclick="toggleCol('left')">◀</button>
+  <button class="col-toggle" id="toggle-right" title="Toggle right panel" onclick="toggleCol('right')">▶</button>
+  <div class="source-switcher" id="source-switcher"></div>
+  <div class="menu">
+    <a href="/">📊 Dashboard</a>
+    <a href="/avfs/dashboard/">AVFS Home</a>
+    <a href="./market" class="active">📈 Market</a>
+    <a href="./ladder-resistance">🎯 Ladder</a>
+    <div id="version-badge" class="version-badge" style="margin-left:8px;padding:6px 8px;border-radius:8px;background:#111; color:#ddd;font-size:11px">loading</div>
+    <div class="version-switcher" style="position:relative;display:inline-block;margin-left:10px">
+      <button class="btn" onclick="toggleVersionMenu()">Version</button>
+      <div id="version-menu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:8px;min-width:180px;z-index:50;box-shadow:0 12px 30px rgba(0,0,0,.25)">
+        <div id="version-menu-list"><button class="btn" disabled>Loading versions…</button></div>
+      </div>
+    </div>
+    <a onclick="alert('📖 User Guide: /docs/USER.md\n📋 System Docs: /docs/SYSTEM.md')">ℹ️ Help</a>
+  </div>
+</nav>
+
+<div class="main">
+  
+  <!-- LEFT: Market Stats -->
+  <div class="col" id="col-left">
+    <div class="pane">
+      <div class="pt">Market Overview</div>
+      <div class="stat">
+        <span class="label">Synthetic Price</span>
+        <span class="value" id="current-price">—</span>
+      </div>
+      <div class="stat">
+        <span class="label">Change (Session)</span>
+        <span class="value" id="price-change">—</span>
+      </div>
+      <div class="stat">
+        <span class="label">Candles</span>
+        <span class="value" id="candle-count">—</span>
+      </div>
+      <div class="stat">
+        <span class="label">Rounds/Candle</span>
+        <span class="value" id="rounds-per-candle">5</span>
+      </div>
+    </div>
+    
+    <div class="pane">
+      <div class="pt">Market State</div>
+      <div id="market-state">
+        <span class="badge normal">Analyzing...</span>
+      </div>
+      <div style="margin-top:8px;font-size:10px;color:var(--muted)" id="state-desc">
+        Waiting for data...
+      </div>
+    </div>
+    
+    <div class="pane grow">
+      <div class="pt">Live Session Rounds</div>
+      <div id="rounds"></div>
+    </div>
+  </div>
+  
+  <!-- CENTER: Chart -->
+  <div class="col">
+    <div class="pane" style="border-bottom:none">
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="active" onclick="switchTab('candles')">📊 Candles</button>
+        <button onclick="switchTab('ladders')">📈 Ladders</button>
+        <button onclick="switchTab('resistance')">🎯 Resistance</button>
+      </div>
+    </div>
+    
+    <!-- Candles Tab -->
+    <div id="tab-candles" class="tab-content active">
+      <div class="pane" style="border-bottom:none;padding-top:0">
+        <div class="tf">
+          <button class="active" onclick="setTimeframe('1r')">1r</button>
+          <button onclick="setTimeframe('rounds')">5r (~3.4min)</button>
+          <button onclick="setTimeframe('3m')">5r (~3.4min)</button>
+          <button onclick="setTimeframe('5m')">8r (~5.4min)</button>
+          <button onclick="setTimeframe('15m')">15r (~10min)</button>
+          <button onclick="setTimeframe('30m')">25r (~17min)</button>
+          <button onclick="setTimeframe('1h')">45r (~30min)</button>
+        </div>
+      </div>
+      <div id="chart"></div>
+    </div>
+    
+    <!-- Ladders Tab -->
+    <div id="tab-ladders" class="tab-content">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;min-height:0;overflow:visible;height:auto;width:100%">
+        <!-- Ladder strength timeline chart -->
+        <div style="display:flex;flex-direction:column;border-right:1px solid var(--border);min-height:0">
+          <div class="pane" style="padding:8px 12px;border-bottom:1px solid var(--border);flex-shrink:0">
+            <div class="pt" style="margin-bottom:0">Ladder Strength · ▲ Asc (green) · ▼ Col (red)</div>
+          </div>
+          <div id="ladder-chart" style="flex:1;min-height:200px;position:relative"></div>
+        </div>
+        <!-- Ladder current status -->
+        <div class="ladder-viz" id="ladders-view" style="overflow-y:auto;padding:8px">
+          <div style="color:var(--muted);font-size:10px">Loading ladder data...</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Resistance Tab -->
+    <div id="tab-resistance" class="tab-content">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;min-height:0;overflow:visible;height:auto;width:100%">
+        <!-- Resistance levels chart -->
+        <div style="display:flex;flex-direction:column;border-right:1px solid var(--border);min-height:0">
+          <div class="pane" style="padding:8px 12px;border-bottom:1px solid var(--border);flex-shrink:0">
+            <div class="pt" style="margin-bottom:0">Combined Resistance Score · 🟢 High · 🟡 Med · ⚫ Low</div>
+          </div>
+          <div id="resistance-chart" style="flex:1;min-height:200px;position:relative"></div>
+        </div>
+        <!-- Resistance current status -->
+        <div class="ladder-viz" id="resistance-view" style="overflow-y:auto;padding:8px">
+          <div style="color:var(--muted);font-size:10px">Loading resistance data...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- RIGHT: Controls -->
+  <div class="col" id="col-right">
+    <div class="pane">
+      <div class="pt">Chart Controls</div>
+      <div class="ctrl">
+        <button class="btn primary" onclick="loadMarketData()">Refresh</button>
+      </div>
+      <div class="ctrl">
+        <button class="btn" onclick="fitChart()">Fit Content</button>
+        <button class="btn" onclick="resetZoom()">Reset Zoom</button>
+      </div>
+      <div style="margin-top:8px">
+        <label style="font-size:10px;color:var(--dim);display:flex;align-items:center;gap:6px">
+          <input type="checkbox" id="auto-fit" checked onchange="toggleAutoFit()">
+          Auto-fit on updates
+        </label>
+      </div>
+    </div>
+    
+    <div class="pane">
+      <div class="pt">Auto-Calibration</div>
+      <div class="stat">
+        <span class="label">Status</span>
+        <span class="value" id="cal-status" style="font-size:9px">Loading...</span>
+      </div>
+      <div class="stat">
+        <span class="label">Score</span>
+        <span class="value" id="cal-score">—</span>
+      </div>
+      <div class="ctrl">
+        <button class="btn" onclick="runCalibration()">Calibrate Now</button>
+      </div>
+    </div>
+    
+    <div class="pane">
+      <div class="pt">Conversion</div>
+      <div class="stat">
+        <span class="label">Points → Mult</span>
+        <button class="btn" onclick="showConversion()" style="font-size:9px;padding:3px 8px">Calculate</button>
+      </div>
+    </div>
+    
+    <div class="pane grow">
+      <div class="pt">Technical Levels</div>
+      <div style="font-size:10px;color:var(--dim);line-height:1.8" id="levels">
+        <div>Support: <span style="color:var(--green)">—</span></div>
+        <div>Resistance: <span style="color:var(--red)">—</span></div>
+        <div>ATR: <span style="color:var(--gold)">—</span></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+console.log('[PointFX] Script loaded');
+
+function getVersionBase() {
+  const segments = window.location.pathname.split('/').filter(Boolean);
+  const first = segments[0] || '';
+  return /^v\d+\.\d+(?:\.\d+)?$/.test(first) ? `/${first}` : '';
+}
+function versionedPath(path) {
+  const normalized = path.startsWith('/') ? path : `/${path}`;
+  return `${getVersionBase()}${normalized}`;
+}
+window.getVersionBase = getVersionBase;
+window.versionedPath = versionedPath;
+
+// Client telemetry helper — lightweight, uses sendBeacon when available
+function sendClientTelemetry(event, meta = {}) {
+  try {
+    const url = `${location.origin}${versionedPath('/api/telemetry/client')}`;
+    const payload = { event, meta, path: location.pathname, source: getPreferredSource(), ts: new Date().toISOString() };
+    const body = JSON.stringify(payload);
+    if (navigator && typeof navigator.sendBeacon === 'function') {
+      const blob = new Blob([body], { type: 'application/json' });
+      navigator.sendBeacon(url, blob);
+    } else {
+      fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }).catch(() => {});
+    }
+  } catch (e) {
+    console.warn('[Telemetry] send failed', e);
+  }
+}
+
+// Initialize game context with source switcher (reload page on change)
+function handleMarketSourceChange(newSource) {
+  window.location.reload();
+}
+
+initGameContext({
+  pickerContainerId: 'source-switcher',
+  onSourceChange: handleMarketSourceChange
+});
+
+
+let chart, candleSeries, volumeSeries;
+let currentTimeframe = '1r';
+let autoFitEnabled = true;
+let isUpdating = false;
+let isFirstLoad = true;
+let _lastCandleCount = 0;   // track how many candles we've already set
+
+// Wait for library to load
+if (typeof LightweightCharts === 'undefined') {
+  console.error('[PointFX] LightweightCharts library not loaded!');
+  document.getElementById('chart').innerHTML = '<div style="color:red;padding:20px">Error: Chart library failed to load</div>';
+} else {
+  console.log('[PointFX] LightweightCharts available:', LightweightCharts);
+}
+
+// Initialize chart
+function initChart() {
+  console.log('[PointFX] Initializing chart...');
+  const chartDiv = document.getElementById('chart');
+  
+  if (!chartDiv) {
+    console.error('[PointFX] Chart div not found!');
+    return;
+  }
+  
+  console.log('[PointFX] Chart div dimensions:', chartDiv.offsetWidth, 'x', chartDiv.offsetHeight);
+  
+  try {
+    chart = LightweightCharts.createChart(chartDiv, {
+    layout: {
+      background: { color: '#0b0b0f' },
+      textColor: '#dde1f0',
+    },
+    grid: {
+      vertLines: { color: '#1e1e2e' },
+      horzLines: { color: '#1e1e2e' },
+    },
+    crosshair: {
+      mode: LightweightCharts.CrosshairMode.Normal,
+    },
+    timeScale: {
+      borderColor: '#1e1e2e',
+      timeVisible: true,
+      secondsVisible: false,
+    },
+    rightPriceScale: {
+      borderColor: '#1e1e2e',
+    },
+    width: chartDiv.offsetWidth,
+    height: chartDiv.offsetHeight,
+  });
+  
+  console.log('[PointFX] Chart created');
+  
+  candleSeries = chart.addCandlestickSeries({
+    upColor: '#22c55e',
+    downColor: '#ef4444',
+    borderVisible: false,
+    wickUpColor: '#22c55e',
+    wickDownColor: '#ef4444',
+  });
+  
+  volumeSeries = chart.addHistogramSeries({
+    color: '#7c3aed',
+    priceFormat: {
+      type: 'volume',
+    },
+    priceScaleId: '',
+  });
+  
+  volumeSeries.priceScale().applyOptions({
+    scaleMargins: {
+      top: 0.8,
+      bottom: 0,
+    },
+  });
+  
+  // Handle resize
+  window.addEventListener('resize', () => {
+    chart.applyOptions({
+      width: chartDiv.offsetWidth,
+      height: chartDiv.offsetHeight,
+    });
+  });
+  
+  console.log('[PointFX] Chart series added');
+  chart.timeScale().fitContent();
+  } catch (err) {
+    console.error('[PointFX] Chart init error:', err);
+    chartDiv.innerHTML = '<div style="color:red;padding:20px">Chart Error: ' + err.message + '</div>';
+  }
+}
+
+// Load market data
+async function loadMarketData() {
+  if (isUpdating) {
+    console.log('[PointFX] Update in progress, skipping...');
+    return;
+  }
+  
+  isUpdating = true;
+  
+  try {
+    const source = getPreferredSource();
+    // avg round = 40.38s. Rounds per candle calculated for each timeframe.
+    let roundsPerCandle = 1;
+    switch(currentTimeframe) {
+      case '1r':     roundsPerCandle = 1;  break;  // 1 candle per round
+      case 'rounds': roundsPerCandle = 5;  break;  // ~3.4 min
+      case '3m':     roundsPerCandle = 5;  break;  // ~3.4 min
+      case '5m':     roundsPerCandle = 8;  break;  // ~5.4 min
+      case '15m':    roundsPerCandle = 15; break;  // ~10 min
+      case '30m':    roundsPerCandle = 25; break;  // ~17 min
+      case '1h':     roundsPerCandle = 45; break;  // ~30 min
+    }
+    
+    console.log('[PointFX] Fetching candles (timeframe:', currentTimeframe, ', rounds/candle:', roundsPerCandle, ')...');
+    const response = await fetch(`${getVersionBase()}/api/market/candles?limit=150&rounds_per_candle=${roundsPerCandle}&source=${encodeURIComponent(source)}`);
+    const data = await response.json();
+    
+    console.log('[PointFX] Received data:', data);
+    
+    if (!data.candles || data.candles.length === 0) {
+      console.warn('[PointFX] No candles available');
+      document.getElementById('current-price').textContent = 'No data';
+      return;
+    }
+    
+    console.log('[PointFX] Processing', data.candles.length, 'candles');
+    
+    // Validate numeric value
+    function isValidNumber(val) {
+      return val !== null && val !== undefined && isFinite(val) && !isNaN(val);
+    }
+    
+    // Transform candles for chart with validation
+    const seenTimes = new Set();
+    const candles = data.candles
+      .map((c, i) => {
+        const timestamp = Math.floor(new Date(c.time).getTime() / 1000);
+        const open = parseFloat(c.open);
+        const high = parseFloat(c.high);
+        const low = parseFloat(c.low);
+        const close = parseFloat(c.close);
+        
+        // Check for duplicates and invalid values
+        const hasDuplicate = seenTimes.has(timestamp);
+        const isValid = isValidNumber(open) && isValidNumber(high) && isValidNumber(low) && isValidNumber(close) && !hasDuplicate;
+        
+        if (isValid) {
+          seenTimes.add(timestamp);
+        }
+        
+        return {
+          time: timestamp,
+          open: open,
+          high: high,
+          low: low,
+          close: close,
+          valid: isValid,
+          duplicate: hasDuplicate,
+          originalTime: c.time
+        };
+      })
+      .filter(c => {
+        if (!c.valid) {
+          if (c.duplicate) {
+            console.warn('[PointFX] Filtered duplicate timestamp:', c.time, c.originalTime);
+          } else {
+            console.warn('[PointFX] Filtered invalid candle:', c);
+          }
+          return false;
+        }
+        return true;
+      })
+      .map(c => ({
+        time: c.time,
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close
+      }));
+    
+    const volumes = data.candles
+      .map((c, i) => {
+        const timestamp = Math.floor(new Date(c.time).getTime() / 1000);
+        const volume = parseFloat(c.volume);
+        return {
+          time: timestamp,
+          value: volume,
+          color: c.close >= c.open ? '#22c55e40' : '#ef444440',
+          valid: isValidNumber(volume)
+        };
+      })
+      .filter(v => v.valid)
+      .map(v => ({
+        time: v.time,
+        value: v.value,
+        color: v.color
+      }));
+    
+    console.log('[PointFX] Valid candles:', candles.length, '/', data.candles.length);
+    console.log('[PointFX] Valid volumes:', volumes.length, '/', data.candles.length);
+    
+    // Sort by time (TradingView requires chronological order)
+    candles.sort((a, b) => a.time - b.time);
+    volumes.sort((a, b) => a.time - b.time);
+    
+    if (candles.length === 0) {
+      console.error('[PointFX] No valid candles to display!');
+      document.getElementById('current-price').textContent = 'Invalid data';
+      isUpdating = false;
+      return;
+    }
+    
+    console.log('[PointFX] Sample candle:', candles[0]);
+    console.log('[PointFX] Setting chart data...');
+    try {
+      const bytes = (new TextEncoder().encode(JSON.stringify({candles: data.candles}))).length;
+      sendClientTelemetry('candles_load', { timeframe: currentTimeframe, candles: candles.length, bytes });
+    } catch (e) { /* ignore telemetry errors */ }
+    
+    // Capture scroll position BEFORE touching the chart
+    const timeScale = chart.timeScale();
+    const logicalRange = isFirstLoad ? null : timeScale.getVisibleLogicalRange();
+    const prevCount = _lastCandleCount;
+
+    if (isFirstLoad || candles.length !== _lastCandleCount) {
+      // Full reload: timeframe changed, or new bars formed
+      candleSeries.setData(candles);
+      volumeSeries.setData(volumes);
+      _lastCandleCount = candles.length;
+    } else {
+      // Same candle count — only last bar updated (forming candle)
+      // update() never resets the viewport
+      const last = candles[candles.length - 1];
+      const lastVol = volumes[volumes.length - 1];
+      if (last) candleSeries.update(last);
+      if (lastVol) volumeSeries.update(lastVol);
+    }
+
+    // Update stats
+    const lastCandle = data.candles[data.candles.length - 1];
+    document.getElementById('current-price').textContent = lastCandle.close.toFixed(2) + 'p';
+    document.getElementById('candle-count').textContent = data.total;
+    document.getElementById('rounds-per-candle').textContent = data.rounds_per_candle;
+
+    const priceChange = lastCandle.close - data.candles[0].open;
+    const changeEl = document.getElementById('price-change');
+    changeEl.textContent = (priceChange >= 0 ? '+' : '') + priceChange.toFixed(2) + 'p';
+    changeEl.className = 'value ' + (priceChange >= 0 ? 'up' : 'down');
+
+    // Load live session rounds
+    await loadLiveSession();
+
+    if (isFirstLoad) {
+      timeScale.fitContent();
+      isFirstLoad = false;
+    } else if (logicalRange && candles.length !== prevCount) {
+      // setData() was called (new bars) — restore/advance viewport
+      const barWidth = Math.max(1, logicalRange.to - logicalRange.from);
+      const wasAtEdge = logicalRange.to >= prevCount - 2;
+      if (wasAtEdge) {
+        // Follow live edge: slide window forward
+        timeScale.setVisibleLogicalRange({
+          from: candles.length - barWidth,
+          to:   candles.length,
+        });
+      } else {
+        // User scrolled back — hold position
+        timeScale.setVisibleLogicalRange(logicalRange);
+      }
+    }
+    // update() path: viewport untouched, no restore needed
+    
+    console.log('[PointFX] Chart ready');
+    isUpdating = false;
+  } catch (err) {
+    console.error('[PointFX] Load error:', err);
+    document.getElementById('current-price').textContent = 'Error: ' + err.message;
+    isUpdating = false;
+  }
+}
+
+// Load live session
+async function loadLiveSession() {
+  try {
+    const response = await fetch(`${getVersionBase()}/api/market/live?source=${encodeURIComponent(getPreferredSource())}`);
+    const data = await response.json();
+    
+    if (!data.session || data.session.length === 0) {
+      return;
+    }
+    
+    const roundsHtml = data.session.map(r => {
+      const pts = r.points;
+      const ptsClass = pts >= 0 ? 'pos' : 'neg';
+      const time = new Date(r.timestamp).toLocaleTimeString();
+      
+      return `<div class="round">
+        <span class="mult">${r.multiplier.toFixed(2)}x</span>
+        <span class="pts ${ptsClass}">${pts >= 0 ? '+' : ''}${pts.toFixed(1)}p</span>
+        <span class="time">${time}</span>
+      </div>`;
+    }).reverse().join('');
+    
+    document.getElementById('rounds').innerHTML = roundsHtml;
+    
+    // Determine market state
+    const change = data.price_change;
+    let state = 'normal';
+    let desc = 'Steady market conditions';
+    
+    if (Math.abs(change) < 10) {
+      state = 'compression';
+      desc = 'Low volatility, range-bound';
+    } else if (change > 20) {
+      state = 'expansion';
+      desc = 'Strong uptrend momentum';
+    } else if (change < -20) {
+      state = 'compression';
+      desc = 'Downtrend pressure building';
+    }
+    
+    document.getElementById('market-state').innerHTML = '<span class="badge ' + state + '">' + state + '</span>';
+    document.getElementById('state-desc').textContent = desc;
+    
+  } catch (err) {
+    console.error('Session load error:', err);
+  }
+}
+
+// Auto-refresh every 15 s when WS is not connected.
+// Polling is now only a fallback when the socket is unavailable or disconnected.
+let autoRefreshInterval = null;
+
+function startFallbackPolling() {
+  if (autoRefreshInterval) return;
+  autoRefreshInterval = setInterval(() => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      loadMarketData();
+    }
+  }, 15000);
+}
+
+function stopFallbackPolling() {
+  if (autoRefreshInterval) {
+    clearInterval(autoRefreshInterval);
+    autoRefreshInterval = null;
+  }
+}
+
+// WebSocket for real-time updates
+let ws;
+let wsReconnectTimer = null;
+let wsReconnectDelay = 1000;
+let _wsPingInterval  = null;   // keepalive ping handle
+
+function scheduleWebSocketReconnect() {
+  if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
+  wsReconnectTimer = setTimeout(() => {
+    connectWebSocket();
+  }, wsReconnectDelay);
+  wsReconnectDelay = Math.min(wsReconnectDelay * 2, 15000);
+}
+
+function connectWebSocket() {
+  if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
+
+  // Guard: only interrupt a socket that is CONNECTING or OPEN.
+  // Never touch a CLOSING (2) socket — doing so causes the
+  // "WebSocket closed before connection established" error loop.
+  if (ws) {
+    if (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN) {
+      ws.onclose = null;
+      ws.close();
+      // Defer opening a new socket until the current one finishes closing.
+      scheduleWebSocketReconnect();
+      return;
+    }
+  }
+
+  const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${window.location.host}${getVersionBase()}/ws?source=${encodeURIComponent(getPreferredSource())}`);
+
+  ws.onopen = () => {
+    wsReconnectDelay = 1000;
+    stopFallbackPolling();
+    console.log('[PointFX] WebSocket connected');
+    // Fix #6 — ping every 10 s to keep the connection alive
+    if (_wsPingInterval) clearInterval(_wsPingInterval);
+    _wsPingInterval = setInterval(() => {
+      if (ws && ws.readyState === WebSocket.OPEN) ws.send('{"type":"ping"}');
+    }, 10000);
+  };
+
+  ws.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      if (data.type === 'pong') return;
+      if (data.type === 'ping') { return; }
+      const eventName = data._event;
+      const shouldRefresh = eventName === 'round' || eventName === 'calibrated';
+      if (shouldRefresh) {
+        console.log(`[PointFX] WS ${eventName} — refreshing chart`);
+        loadMarketData();
+      } else if (eventName === 'connected' || eventName === 'update') {
+        console.log(`[PointFX] WS ${eventName} — ignored for refresh`);
+      } else if (eventName === 'calibration') {
+        console.log('[PointFX] Calibration update received');
+        loadCalibrationStatus();
+      }
+    } catch (err) {
+      console.error('[PointFX] WS message error:', err);
+    }
+  };
+
+  ws.onclose = () => {
+    console.log('[PointFX] WebSocket closed, reconnecting...');
+    if (_wsPingInterval) { clearInterval(_wsPingInterval); _wsPingInterval = null; }
+    startFallbackPolling();
+    scheduleWebSocketReconnect();
+  };
+
+  // onerror is always followed by onclose — let onclose handle the reconnect.
+  // Calling ws.close() here would trigger another error → infinite loop.
+  ws.onerror = () => {};
+}
+
+// ── Collapsible panels ────────────────────────────────────────────────────────
+const colState = { left: true, right: true };
+
+function toggleCol(side) {
+  const col  = document.getElementById(`col-${side}`);
+  const btn  = document.getElementById(`toggle-${side}`);
+  colState[side] = !colState[side];
+  const open = colState[side];
+
+  if (open) {
+    col.classList.remove('collapsed');
+    col.style.minWidth = '';
+    col.style.maxWidth = '';
+    btn.textContent = side === 'left' ? '◀' : '▶';
+    btn.title = `Collapse ${side} panel`;
+  } else {
+    col.classList.add('collapsed');
+    col.style.minWidth = '0';
+    col.style.maxWidth = '0';
+    btn.textContent = side === 'left' ? '▶' : '◀';
+    btn.title = `Expand ${side} panel`;
+  }
+
+  // Recalculate grid — read actual widths after collapse
+  requestAnimationFrame(() => {
+    const lw = colState.left  ? '260px' : '0px';
+    const rw = colState.right ? '220px' : '0px';
+    document.querySelector('.main').style.gridTemplateColumns = `${lw} 1fr ${rw}`;
+
+    // Resize charts to new width
+    setTimeout(() => {
+      if (chart) {
+        const div = document.getElementById('chart');
+        chart.applyOptions({ width: div.offsetWidth, height: div.offsetHeight });
+      }
+      if (ladderChart) {
+        const div = document.getElementById('ladder-chart');
+        if (div && div.offsetWidth) ladderChart.applyOptions({ width: div.offsetWidth, height: div.offsetHeight });
+      }
+      if (resistanceChart) {
+        const div = document.getElementById('resistance-chart');
+        if (div && div.offsetWidth) resistanceChart.applyOptions({ width: div.offsetWidth, height: div.offsetHeight });
+      }
+    }, 220);  // after CSS transition finishes
+  });
+}
+
+function setTimeframe(tf) {
+  currentTimeframe = tf;
+  document.querySelectorAll('.tf button').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  
+  console.log(`[PointFX] Switching to timeframe: ${tf}`);
+  isFirstLoad = true;
+  _lastCandleCount = 0;
+  loadMarketData();
+}
+
+function toggleAutoFit() {
+  autoFitEnabled = document.getElementById('auto-fit').checked;
+  console.log('[PointFX] Auto-fit:', autoFitEnabled ? 'enabled' : 'disabled');
+}
+
+function fitChart() {
+  if (chart) {
+    chart.timeScale().fitContent();
+    isFirstLoad = false;
+  }
+}
+
+function resetZoom() {
+  if (chart) {
+    chart.timeScale().fitContent();
+    isFirstLoad = false;
+  }
+}
+
+function toggleCrosshair() {
+  console.log('Crosshair toggled');
+}
+
+function showConversion() {
+  alert('Balanced Point System:\n\n1.0x = -15p (34% of rounds)\n1.5x = -5p\n2.0x = 0p (median)\n3.0x = +6p\n5.0x = +12p\n10x = +25p\n50x = +60p\n100x = +80p\n1000x = +100p');
+}
+
+// Tab switching
+let currentTab = 'candles';
+function switchTab(tabName) {
+  currentTab = tabName;
+  
+  // Update tab buttons
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  
+  // Update tab content
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById(`tab-${tabName}`).classList.add('active');
+  
+  // Load data after layout settles (tab must be visible for chart dimensions)
+  requestAnimationFrame(() => {
+    if (tabName === 'ladders') {
+      loadLadderData();
+    } else if (tabName === 'resistance') {
+      loadResistanceData();
+    }
+  });
+  
+  console.log(`[PointFX] Switched to ${tabName} tab`);
+}
+
+let ladderChart = null, ladderAscSeries = null, ladderColSeries = null;
+let resistanceChart = null, resistanceBarSeries = null;
+
+// Initialize ladder strength chart
+function initLadderChart() {
+  const div = document.getElementById('ladder-chart');
+  if (!div || ladderChart) return;
+  
+  // Use offsetHeight if available, else compute from viewport
+  const h = div.offsetHeight || Math.max(200, window.innerHeight - 140);
+  const w = div.offsetWidth || Math.max(300, (window.innerWidth - 480) / 2);
+  
+  ladderChart = LightweightCharts.createChart(div, {
+    layout: { background: {color:'#0b0b0f'}, textColor:'#dde1f0' },
+    grid: { vertLines:{color:'#1e1e2e'}, horzLines:{color:'#1e1e2e'} },
+    timeScale: { borderColor:'#1e1e2e', timeVisible:true, secondsVisible:true },
+    rightPriceScale: { borderColor:'#1e1e2e' },
+    width: w,
+    height: h,
+  });
+  
+  // Ascending ladder strength (green area, top half)
+  ladderAscSeries = ladderChart.addAreaSeries({
+    lineColor:'#22c55e', topColor:'#22c55e50', bottomColor:'transparent',
+    lineWidth:2, title:'▲ Asc Strength',
+  });
+  ladderAscSeries.priceScale().applyOptions({ scaleMargins:{top:0.05, bottom:0.52} });
+  
+  // Collapse ladder strength (red area, bottom half)
+  ladderColSeries = ladderChart.addAreaSeries({
+    lineColor:'#ef4444', topColor:'#ef444450', bottomColor:'transparent',
+    lineWidth:2, title:'▼ Col Strength',
+  });
+  ladderColSeries.priceScale().applyOptions({ scaleMargins:{top:0.52, bottom:0.05} });
+  
+  window.addEventListener('resize', () => {
+    ladderChart.applyOptions({ width:div.offsetWidth, height:div.offsetHeight });
+  });
+}
+
+// Initialize resistance histogram chart
+function initResistanceChart() {
+  const div = document.getElementById('resistance-chart');
+  if (!div || resistanceChart) return;
+  
+  const h = div.offsetHeight || Math.max(200, window.innerHeight - 140);
+  const w = div.offsetWidth || Math.max(300, (window.innerWidth - 480) / 2);
+  
+  resistanceChart = LightweightCharts.createChart(div, {
+    layout: { background:{color:'#0b0b0f'}, textColor:'#dde1f0' },
+    grid: { vertLines:{color:'#1e1e2e'}, horzLines:{color:'#1e1e2e'} },
+    timeScale: { borderColor:'#1e1e2e', timeVisible:true, secondsVisible:true },
+    rightPriceScale: { borderColor:'#1e1e2e' },
+    width: w,
+    height: h,
+  });
+  
+  // Combined resistance score as histogram (0.0–1.0)
+  resistanceBarSeries = resistanceChart.addHistogramSeries({
+    color:'#f59e0b',
+    base: 0,
+    priceFormat: { type:'price', precision:2, minMove:0.01 },
+  });
+  
+  window.addEventListener('resize', () => {
+    resistanceChart.applyOptions({ width:div.offsetWidth, height:div.offsetHeight });
+  });
+}
+
+// Fetch session phases and render ladder/resistance charts
+let _phaseCache = null;
+let _lastRoundId = 0;
+const _etagCache = {};
+const _sessionCache = { key: 'avfs_market_session_cache', ttlMs: 60000 };
+
+function getPersistentSessionCacheKey() {
+  return `${_sessionCache.key}:${getPreferredSource() || 'aviator'}`;
+}
+
+function readPersistentSessionCache() {
+  try {
+    const raw = localStorage.getItem(getPersistentSessionCacheKey());
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const now = Date.now();
+    if (!parsed || !parsed.ts || now - parsed.ts > _sessionCache.ttlMs) return null;
+    return parsed.data || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function writePersistentSessionCache(data) {
+  try {
+    localStorage.setItem(getPersistentSessionCacheKey(), JSON.stringify({ ts: Date.now(), data }));
+  } catch (e) {
+    // Ignore storage failures.
+  }
+}
+
+async function fetchWithEtag(url, options = {}) {
+  const headers = new Headers(options.headers || {});
+  if (_etagCache[url]) {
+    headers.set('If-None-Match', _etagCache[url]);
+  }
+
+  const resp = await fetch(url, { ...options, headers });
+  if (resp.status === 304) {
+    return { status: 304, data: null, headers: resp.headers };
+  }
+
+  const data = await resp.json();
+  const etag = resp.headers.get('ETag');
+  if (etag) {
+    _etagCache[url] = etag;
+  }
+  return { status: resp.status, data, headers: resp.headers };
+}
+
+async function loadSessionPhaseCharts() {
+  try {
+    const source = getPreferredSource();
+    const cachedPayload = readPersistentSessionCache();
+    if (!cachedPayload && !_phaseCache) {
+      _phaseCache = { rounds: [] };
+    }
+    if (cachedPayload && !_phaseCache) {
+      _phaseCache = cachedPayload;
+      const latestRoundId = (cachedPayload && cachedPayload.latest_round_id) ?? (cachedPayload && cachedPayload.last_round_id) ?? ((cachedPayload.rounds && cachedPayload.rounds.length) ? cachedPayload.rounds[cachedPayload.rounds.length - 1].id || 0 : 0);
+      _lastRoundId = latestRoundId || 0;
+    }
+    let url;
+    let useFullLoad = _lastRoundId === 0;
+    
+    if (useFullLoad) {
+      // First load: fetch full session
+      url = `${getVersionBase()}/api/market/session-phases?source=${encodeURIComponent(source)}`;
+      console.log('[Market] Full load:', url);
+      const resp = await fetchWithEtag(url);
+      const data = resp.status === 304 ? _phaseCache : resp.data;
+      if (!data || data.error || !data.rounds || !data.rounds.length) return _phaseCache;
+      _phaseCache = data;
+      writePersistentSessionCache(data);
+      const latestRoundId = (data && data.latest_round_id) ?? (data && data.last_round_id) ?? ((data.rounds && data.rounds.length) ? data.rounds[data.rounds.length - 1].id || 0 : 0);
+      _lastRoundId = latestRoundId || 0;
+      try { const bytes = (new TextEncoder().encode(JSON.stringify(data))).length; sendClientTelemetry('session_phases_full', { rounds: data.rounds.length, bytes }); } catch(e){}
+      return data;
+    } else {
+      // Delta load: fetch only new rounds since last update
+      const safeLastRoundId = Number.isFinite(_lastRoundId) ? _lastRoundId : 0;
+      url = `${getVersionBase()}/api/market/session-phases-delta?source=${encodeURIComponent(source)}&last_round_id=${safeLastRoundId}`;
+      console.log('[Market] Delta load:', url);
+      const resp = await fetchWithEtag(url);
+      const data = resp.status === 304 ? { is_stale: true } : resp.data;
+      
+      // Check if stale (no new data)
+      if (data.is_stale) {
+        console.log('[Market] No new rounds (is_stale=true)');
+        return _phaseCache;  // Return cached data
+      }
+      
+      // Merge new rounds into cache
+      if (data.new_rounds && data.new_rounds.length > 0) {
+        if (!_phaseCache) _phaseCache = {};
+        if (!_phaseCache.rounds) _phaseCache.rounds = [];
+        _phaseCache.rounds.push(...data.new_rounds);
+        _phaseCache.phases = data.phases || _phaseCache.phases;
+        _lastRoundId = (data && (data.last_round_id ?? data.latest_round_id)) || _lastRoundId;
+        writePersistentSessionCache(_phaseCache);
+        try { const bytes = (new TextEncoder().encode(JSON.stringify(data))).length; sendClientTelemetry('session_phases_delta', { new_rounds: data.new_rounds.length, total_rounds: _phaseCache.rounds.length, bytes }); } catch(e){}
+        console.log('[Market] Delta: +' + data.new_rounds.length + ' rounds, total=' + _phaseCache.rounds.length);
+      }
+      return _phaseCache;
+    }
+  } catch(e) {
+    console.error('[Market] Phase load error:', e);
+    return null;
+  }
+}
+
+// Build monotonic clean timestamps from session rounds (shared helper)
+function buildCleanTimestamps(rounds) {
+  const AVG = 40.38;
+  const parsed = rounds.map(r => {
+    if (r.timestamp) {
+      const t = new Date(r.timestamp).getTime();
+      if (!isNaN(t) && t > 0) return Math.floor(t / 1000);
+    }
+    return null;
+  });
+  const valid = parsed.filter(t => t !== null).sort((a, b) => a - b);
+  const median = valid.length ? valid[Math.floor(valid.length / 2)] : Math.floor(Date.now() / 1000);
+  const stdRange = 6 * 3600;
+  let base = null;
+  for (let i = 0; i < parsed.length; i++) {
+    if (parsed[i] !== null && Math.abs(parsed[i] - median) < stdRange) {
+      base = parsed[i] - i * AVG;
+      break;
+    }
+  }
+  if (base === null) base = Math.floor(Date.now() / 1000) - rounds.length * AVG;
+  const result = [];
+  const seenTs = new Set();
+  for (let i = 0; i < rounds.length; i++) {
+    const real = parsed[i];
+    let ts;
+    if (real !== null && Math.abs(real - median) < stdRange) {
+      ts = Math.max(real, result.length ? result[result.length - 1] + 1 : real);
+    } else {
+      ts = Math.floor(base + i * AVG);
+      if (result.length) ts = Math.max(ts, result[result.length - 1] + 1);
+    }
+    while (seenTs.has(ts)) ts++;
+    seenTs.add(ts);
+    result.push(ts);
+  }
+  return result;
+}
+
+let _ladderFirstLoad = true;
+let _resistanceFirstLoad = true;
+
+async function renderLadderChart() {
+  initLadderChart();
+  if (!ladderChart) return;
+  
+  const div = document.getElementById('ladder-chart');
+  if (div && div.offsetWidth && div.offsetHeight) {
+    ladderChart.applyOptions({ width: div.offsetWidth, height: div.offsetHeight });
+  }
+  
+  const data = _phaseCache || await loadSessionPhaseCharts();
+  if (!data || !data.rounds || !data.rounds.length) return;
+  
+  const rounds = data.rounds;
+  const timestamps = buildCleanTimestamps(rounds);
+  
+  const ascData = [], colData = [];
+  rounds.forEach((r, i) => {
+    const ts = timestamps[i];
+    ascData.push({ time: ts, value: r.signals?.ascending_ladder?.strength_score ?? 0 });
+    colData.push({ time: ts, value: r.signals?.collapse_ladder?.strength_score ?? 0 });
+  });
+  
+  const ts = ladderChart.timeScale();
+  const lr = _ladderFirstLoad ? null : ts.getVisibleLogicalRange();
+  
+  ladderAscSeries.setData(ascData);
+  ladderColSeries.setData(colData);
+  
+  if (_ladderFirstLoad) {
+    ts.fitContent();
+    _ladderFirstLoad = false;
+  } else if (lr) {
+    const barWidth = Math.max(1, lr.to - lr.from);
+    const wasAtEdge = lr.to >= rounds.length - 2;
+    ts.setVisibleLogicalRange(wasAtEdge
+      ? { from: rounds.length - barWidth, to: rounds.length }
+      : lr);
+  }
+}
+
+async function renderResistanceChart() {
+  initResistanceChart();
+  if (!resistanceChart) return;
+  
+  // Resize to fit current container
+  const div = document.getElementById('resistance-chart');
+  if (div && div.offsetWidth && div.offsetHeight) {
+    resistanceChart.applyOptions({ width: div.offsetWidth, height: div.offsetHeight });
+  }
+  
+  const data = _phaseCache || await loadSessionPhaseCharts();
+  if (!data || !data.rounds || !data.rounds.length) return;
+  
+  const rounds = data.rounds;
+  const timestamps = buildCleanTimestamps(rounds);
+  const barData = [];
+  
+  rounds.forEach((r, i) => {
+    const combined = r.signals?.resistance?.combined_score ?? 0;
+    const color = combined >= 0.7 ? '#22c55e' : combined >= 0.4 ? '#f59e0b' : '#4a5070';
+    barData.push({ time: timestamps[i], value: combined, color });
+  });
+  
+  const rts = resistanceChart.timeScale();
+  const rlr = _resistanceFirstLoad ? null : rts.getVisibleLogicalRange();
+  
+  resistanceBarSeries.setData(barData);
+  
+  if (_resistanceFirstLoad) {
+    rts.fitContent();
+    _resistanceFirstLoad = false;
+  } else if (rlr) {
+    const barWidth = Math.max(1, rlr.to - rlr.from);
+    const wasAtEdge = rlr.to >= rounds.length - 2;
+    rts.setVisibleLogicalRange(wasAtEdge
+      ? { from: rounds.length - barWidth, to: rounds.length }
+      : rlr);
+  }
+  console.log('[Market] Resistance chart rendered:', barData.length, 'points');
+}
+
+// Load ladder status panel (right side text)
+async function loadLadderData() {
+  await loadSessionPhaseCharts();
+  renderLadderChart();
+  
+  try {
+    const response = await fetch(`${getVersionBase()}/analysis?source=${encodeURIComponent(getPreferredSource())}`);
+    const data = await response.json();
+    
+    const signals = data.signals || {};
+    const asc = signals.ascending_ladder || {};
+    const col = signals.collapse_ladder || {};
+    const conf = data.prediction_confidence || {};
+    
+    let html = '';
+    
+    // Confidence summary
+    const confVal = conf.confidence || 0;
+    const confClass = confVal >= 0.7 ? 'active' : '';
+    html += `<div class="ladder-box ${confClass}">
+      <div class="ladder-title">🎯 Confidence · State: <span class="badge ${data.state||'Normal'}" style="font-size:8px">${data.state||'—'}</span></div>
+      <div class="ladder-stat">
+        <span class="label">Level</span>
+        <span class="value">${(confVal*100).toFixed(0)}% ${confVal >= 0.7 ? '🔥 HIGH' : confVal >= 0.5 ? '⚡ MED' : '📊 LOW'}</span>
+      </div>
+      <div class="ladder-stat">
+        <span class="label">Moonshot Prob</span>
+        <span class="value">${((conf.moonshot_probability||0)*100).toFixed(0)}%</span>
+      </div>
+    </div>`;
+    
+    // Next 3 predictions
+    const preds = data.predictions || [];
+    if (preds.length) {
+      html += `<div class="ladder-box">
+        <div class="ladder-title">📊 Next 3 Probable</div>
+        ${buildPredHtml(preds)}
+      </div>`;
+    }
+    
+    // Ascending ladder
+    if (asc.active) {
+      html += `<div class="ladder-box active">
+        <div class="ladder-title">▲ Ascending Ladder</div>
+        <div class="ladder-stat">
+          <span class="label">Length</span>
+          <span class="value">${asc.length} rounds</span>
+        </div>
+        <div class="ladder-stat">
+          <span class="label">Floor</span>
+          <span class="value">${asc.floor?.toFixed(2)}x</span>
+        </div>
+        <div class="ladder-stat">
+          <span class="label">Strength Score</span>
+          <span class="value"><span class="stars">${getStars(asc.strength_score||0)}</span> ${(asc.strength_score||0).toFixed(2)}</span>
+        </div>
+        <div class="ladder-stat">
+          <span class="label">Freshness</span>
+          <span class="value">${((asc.freshness||0)*100).toFixed(0)}%</span>
+        </div>
+        <div class="ladder-stat">
+          <span class="label">Nested Ladders</span>
+          <span class="value">${asc.strength||0}</span>
+        </div>
+        <div class="ladder-stat">
+          <span class="label">Since Confirmed</span>
+          <span class="value">${asc.rounds_since_confirmed||0} rounds ago</span>
+        </div>
+        <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:9px;color:var(--dim)">
+          ${asc.strength_score >= 0.9 ? 'STRONG: 90% ignition (30+ rounds)' : asc.strength_score >= 0.6 ? 'MEDIUM: Building momentum' : 'WEAK: Early formation'}
+        </div>
+      </div>`;
+    } else {
+      html += `<div class="ladder-box">
+        <div class="ladder-title">▲ Ascending Ladder</div>
+        <div style="color:var(--muted);font-size:10px">Inactive</div>
+      </div>`;
+    }
+    
+    // Collapse ladder
+    if (col.active) {
+      const isFizzle = col.is_fizzle || false;
+      html += `<div class="ladder-box ${isFizzle ? 'fizzle' : 'active'}">
+        <div class="ladder-title">▼ Collapse Ladder ${isFizzle ? '⚠️ FIZZLE' : ''}</div>
+        <div class="ladder-stat">
+          <span class="label">Run</span>
+          <span class="value">${col.run} rounds</span>
+        </div>
+        <div class="ladder-stat">
+          <span class="label">Ceiling</span>
+          <span class="value">${col.ceiling?.toFixed(1)}x</span>
+        </div>
+        <div class="ladder-stat">
+          <span class="label">Strength Score</span>
+          <span class="value"><span class="stars">${getStars(col.strength_score||0)}</span> ${(col.strength_score||0).toFixed(2)}</span>
+        </div>
+        <div class="ladder-stat">
+          <span class="label">Freshness</span>
+          <span class="value">${((col.freshness||0)*100).toFixed(0)}%</span>
+        </div>
+        <div class="ladder-stat">
+          <span class="label">Breakout Probability</span>
+          <span class="value">${col.breakout_pct?.toFixed(0)}%</span>
+        </div>
+        <div class="ladder-stat">
+          <span class="label">Predicted Breakout</span>
+          <span class="value">${col.predicted_breakout?.toFixed(0)}x</span>
+        </div>
+        <div class="ladder-stat">
+          <span class="label">Since Confirmed</span>
+          <span class="value">${col.rounds_since_confirmed||0} rounds ago</span>
+        </div>
+        ${isFizzle ? `<div style="margin-top:8px;padding:6px;background:#2a0a0a;border:1px solid var(--red);border-radius:4px;font-size:9px;color:var(--red)">
+          FIZZLE: Pattern exhausted. Only 10% moonshot probability.
+        </div>` : `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:9px;color:var(--dim)">
+          ${col.strength_score >= 0.9 ? 'PEAK: 52% moonshot (15-20 rounds)' : col.strength_score >= 0.5 ? 'BUILDING: Strength increasing' : 'EARLY: Pattern just starting'}
+        </div>`}
+      </div>`;
+    } else {
+      html += `<div class="ladder-box">
+        <div class="ladder-title">▼ Collapse Ladder</div>
+        <div style="color:var(--muted);font-size:10px">Inactive</div>
+      </div>`;
+    }
+    
+    document.getElementById('ladders-view').innerHTML = html;
+    
+  } catch (err) {
+    console.error('[PointFX] Ladder data error:', err);
+    document.getElementById('ladders-view').innerHTML = '<div style="color:var(--red);font-size:10px">Error loading ladder data</div>';
+  }
+}
+
+// Helper: build prediction html for ladder/resistance panels
+function buildPredHtml(preds) {
+  const CAPS = {Normal:20, Collapse:5, Exhaustion:2, Shelf:8, Bait:8, Ignition:20, Moonshot:100};
+  return (preds||[]).slice(0,3).map((p,i) => {
+    const lo = p.range_lo ?? p.range?.[0] ?? 0;
+    const hi = p.range_hi ?? p.range?.[1] ?? 0;
+    const capHi = Math.min(hi, CAPS[p.state]||hi);
+    const target = p.breakout_target && p.breakout_target > capHi 
+      ? ` → 🎯${p.breakout_target.toFixed(0)}x` : '';
+    const pct = (p.probability*100).toFixed(0);
+    const rankColor = i===0?'var(--gold)':i===1?'var(--blue)':'var(--muted)';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid #111118;font-size:9px">
+      <span class="badge ${p.state}" style="font-size:8px;padding:1px 5px">${p.state}</span>
+      <span style="color:var(--gold);font-family:monospace">${lo.toFixed(1)}x–${capHi.toFixed(1)}x${target}</span>
+      <span style="color:${rankColor};font-weight:700">${pct}%</span>
+    </div>`;
+  }).join('');
+}
+
+// Load resistance visualization data
+async function loadResistanceData() {
+  await loadSessionPhaseCharts();
+  renderResistanceChart();
+  try {
+    const response = await fetch(`${getVersionBase()}/analysis?source=${encodeURIComponent(getPreferredSource())}`);
+    const data = await response.json();
+    
+    const signals = data.signals || {};
+    const col = signals.collapse_ladder || {};
+    // Upper resistance now at signals.upper_resistance (new path), fallback to col.resistance
+    const upperRes = signals.upper_resistance || col.resistance || {};
+    const lower = (col.resistance || {}).lower_zone || {};
+    const pr = signals.pressure_release || {};
+    
+    const upper = upperRes.upper_levels || upperRes.levels || [];
+    const recentlyCleared = upperRes.recently_cleared || 0;
+    const combined = (col.resistance || {}).combined_score || 0;
+    
+    let html = '';
+    
+    // Pressure release box (top — most actionable)
+    if (pr.release_type && pr.release_type !== 'none') {
+      const prColor = pr.cooldown_active ? 'var(--red)' : pr.expansion_active ? 'var(--green)' : 'var(--muted)';
+      const prBg    = pr.cooldown_active ? '#2a0a0a' : pr.expansion_active ? '#0a2010' : 'var(--panel)';
+      html += `<div class="ladder-box" style="border-color:${prColor};background:${prBg}">
+        <div class="ladder-title">${pr.cooldown_active ? '⬇️ RELEASE COOLDOWN' : pr.expansion_active ? '📈 EXPANSION PHASE' : '✅ RELEASED'}</div>
+        <div class="ladder-stat"><span class="label">Type</span><span class="value">${pr.release_type.replace('_',' ').toUpperCase()}</span></div>
+        <div class="ladder-stat"><span class="label">Ceiling cleared</span><span class="value" style="color:${prColor}">${pr.ceiling_cleared ? pr.ceiling_cleared+'x' : '—'}</span></div>
+        <div class="ladder-stat"><span class="label">Rounds since</span><span class="value">${pr.rounds_since}r</span></div>
+        ${pr.expansion_active ? `<div class="ladder-stat"><span class="label">Range expansion</span><span class="value" style="color:var(--green)">×${pr.range_expansion?.toFixed(2)}</span></div>` : ''}
+        <div style="margin-top:4px;font-size:8px;color:${prColor}">${pr.forecast_note || ''}</div>
+      </div>`;
+    }
+    
+    // Upper resistance
+    const upperClass = upper.length >= 3 ? 'active' : '';
+    html += `<div class="ladder-box ${upperClass}">
+      <div class="ladder-title">📍 Upper Resistance</div>
+      <div class="ladder-stat"><span class="label">Uncleared levels</span><span class="value">${upper.length} ${upper.length >= 3 ? '🔥' : ''}</span></div>
+      <div class="ladder-stat"><span class="label">Recently cleared</span><span class="value" style="color:${recentlyCleared>=2?'var(--green)':'var(--dim)'}">${recentlyCleared}lvl ${recentlyCleared>=2?'🔓':''}</span></div>
+      ${upper.length >= 3 ? `<div style="margin:4px 0;padding:3px;background:#2a1a00;border:1px solid var(--gold);border-radius:3px;font-size:8px;color:var(--gold)">🔥 3+ levels = 75% moonshot signal</div>` : ''}
+      ${recentlyCleared >= 2 ? `<div style="margin:4px 0;padding:3px;background:#0a2010;border:1px solid var(--green);border-radius:3px;font-size:8px;color:var(--green)">🔓 Ceiling cleared → expansion phase likely</div>` : ''}
+      <div class="resistance-list">
+        ${upper.length > 0 ? upper.slice(0, 6).map(lv => `
+          <div class="resistance-item ${upper.length >= 3 ? 'strong' : ''}">
+            ${lv.ceiling}x — ${lv.rounds_ago}r ago · max since: ${lv.highest_since?.toFixed(1)}x
+          </div>`).join('') : '<div style="color:var(--muted);font-size:9px">No uncleared ceilings</div>'}
+      </div>
+    </div>`;
+    html += `<div class="ladder-box ${lower.active ? 'active' : ''}">
+      <div class="ladder-title">📉 Lower Compression</div>
+      ${lower.active ? `
+        <div class="ladder-stat"><span class="label">Type</span><span class="value">${(lower.label||'').toUpperCase()}</span></div>
+        <div class="ladder-stat"><span class="label">Zone</span><span class="value">${lower.zone?.[0]}x – ${lower.zone?.[1]}x</span></div>
+        <div class="ladder-stat"><span class="label">Density</span><span class="value">${((lower.density||0)*100).toFixed(0)}%</span></div>
+        <div class="ladder-stat"><span class="label">Rounds in zone</span><span class="value">${lower.count||0}</span></div>
+      ` : `<div style="color:var(--muted);font-size:10px">No compression detected</div>`}
+    </div>`;
+    
+    // Combined resistance
+    const combinedClass = combined >= 0.7 ? 'active' : '';
+    html += `<div class="ladder-box ${combinedClass}">
+      <div class="ladder-title">🎯 Combined Score</div>
+      <div class="ladder-stat"><span class="label">Score</span><span class="value">${combined.toFixed(2)} ${combined >= 0.7 ? '🚀' : combined >= 0.4 ? '⚡' : ''}</span></div>
+      ${combined >= 0.7 ? `<div style="margin:4px 0;padding:3px;background:#0a2010;border:1px solid var(--green);border-radius:3px;font-size:8px;color:var(--green)">🚀 HIGH: Moonshot likely within 5–15 rounds</div>`
+      : combined >= 0.4 ? `<div style="margin:4px 0;padding:3px;background:#2a1a00;border:1px solid var(--gold);border-radius:3px;font-size:8px;color:var(--gold)">⚡ MEDIUM: Pressure building</div>`
+      : `<div style="font-size:8px;color:var(--muted);margin-top:3px">📊 LOW: Early or no resistance</div>`}
+      <div style="font-size:8px;color:var(--dim);margin-top:4px;line-height:1.5">
+        Upper: ${upper.length}lvl · Lower: ${lower.active?'Active':'—'} · Cleared: ${recentlyCleared}lvl
+      </div>
+    </div>`;
+
+    document.getElementById('resistance-view').innerHTML = html;
+    
+    // Append predictions
+    const preds = data.predictions || [];
+    if (preds.length) {
+      document.getElementById('resistance-view').innerHTML += `
+        <div class="ladder-box" style="margin-top:4px">
+          <div class="ladder-title">📊 Next 3 Probable</div>
+          ${buildPredHtml(preds)}
+        </div>`;
+    }
+    
+  } catch (err) {
+    console.error('[PointFX] Resistance data error:', err);
+    document.getElementById('resistance-view').innerHTML = '<div style="color:var(--red);font-size:10px">Error loading resistance data</div>';
+  }
+}
+// Helper function for stars
+function getStars(score) {
+  if (score >= 0.9) return '⭐⭐⭐⭐⭐';
+  if (score >= 0.7) return '⭐⭐⭐⭐';
+  if (score >= 0.5) return '⭐⭐⭐';
+  if (score >= 0.3) return '⭐⭐';
+  return '⭐';
+}
+
+// Calibration functions
+async function loadCalibrationStatus() {
+  try {
+    const response = await fetch(`${getVersionBase()}/api/calibration/status`);
+    const data = await response.json();
+    
+    const score = data.config.metrics.overall_score;
+    document.getElementById('cal-score').textContent = score.toFixed(3);
+    
+    const lastCal = data.config.last_calibration;
+    if (lastCal) {
+      const date = new Date(lastCal);
+      const hoursAgo = ((Date.now() - date.getTime()) / 3600000).toFixed(1);
+      document.getElementById('cal-status').textContent = `${hoursAgo}h ago`;
+    } else {
+      document.getElementById('cal-status').textContent = 'Never';
+    }
+    
+  } catch (err) {
+    console.error('[PointFX] Calibration status error:', err);
+  }
+}
+
+async function runCalibration() {
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = 'Calibrating...';
+  
+  try {
+    const response = await fetch(`${getVersionBase()}/api/calibration/run?force=false`, {
+      method: 'POST'
+    });
+    const result = await response.json();
+    
+    if (result.status === 'applied') {
+      alert(`✓ Calibration Applied!\n\nNew Score: ${result.new_score.toFixed(3)}\nImprovement: +${result.improvement.toFixed(3)}\n\nSystem has been upgraded!`);
+      loadMarketData();  // Reload with new point map
+      loadCalibrationStatus();
+    } else if (result.status === 'no_change') {
+      alert(`No Improvement Found\n\nCurrent score: ${result.current_score.toFixed(3)}\nTested score: ${result.tested_score.toFixed(3)}\n\nKeeping current configuration.`);
+    } else if (result.status === 'skipped') {
+      alert(`Calibration Skipped\n\n${result.reason}`);
+    }
+    
+  } catch (err) {
+    console.error('[PointFX] Calibration error:', err);
+    alert('Calibration failed: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Calibrate Now';
+  }
+}
+
+// Init
+console.log('[PointFX] Initializing...');
+try {
+  initChart();
+  console.log('[PointFX] Chart initialized');
+  loadMarketData().then(() => {
+    console.log('[PointFX] Data loaded successfully');
+    // Connect WebSocket for real-time updates
+    connectWebSocket();
+    // Load calibration status
+    loadCalibrationStatus();
+  }).catch(err => {
+    console.error('[PointFX] Load failed:', err);
+  });
+} catch (err) {
+  console.error('[PointFX] Init error:', err);
+}
+
+// Fix #4 — pause polling and close WS when tab is hidden; resume on return.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    stopFallbackPolling();
+    if (_wsPingInterval)     { clearInterval(_wsPingInterval);     _wsPingInterval     = null; }
+    if (wsReconnectTimer)    { clearTimeout(wsReconnectTimer);     wsReconnectTimer    = null; }
+    if (ws) {
+      if (ws.readyState === WebSocket.CONNECTING) {
+        // Closing a CONNECTING socket produces "WebSocket is closed before the
+        // connection is established". Wait for the handshake, then close.
+        ws.onopen  = () => { ws.onclose = null; ws.close(); };
+        ws.onerror = () => { /* onclose fires automatically */ };
+        ws.onclose = () => {};
+      } else if (ws.readyState === WebSocket.OPEN) {
+        ws.onclose = null; // suppress reconnect while hidden
+        ws.close();
+      }
+      // CLOSING: already on its way out, nothing to do
+    }
+  } else {
+    loadMarketData();
+    // If the socket is still CLOSING, wait for teardown to complete before
+    // opening a new one — calling connectWebSocket() too early causes the
+    // "WebSocket is closed before the connection is established" error.
+    if (ws && ws.readyState === WebSocket.CLOSING) {
+      ws.onclose = () => { connectWebSocket(); };
+    } else {
+      connectWebSocket();
+    }
+    if (!autoRefreshInterval) startFallbackPolling();
+  }
+});
+
+window.addEventListener('pagehide', () => {
+  if (autoRefreshInterval) { clearInterval(autoRefreshInterval); autoRefreshInterval = null; }
+  if (_wsPingInterval)     { clearInterval(_wsPingInterval);     _wsPingInterval     = null; }
+  if (wsReconnectTimer)    { clearTimeout(wsReconnectTimer);     wsReconnectTimer    = null; }
+  if (ws && ws.readyState !== WebSocket.CLOSED) { ws.onclose = null; ws.close(); }
+});
+</script>
+<script>
+// Version badge initializer for market page
+(function(){
+  function getVersionBaseLocal(){const segments = window.location.pathname.split('/').filter(Boolean);const first = segments[0]||'';return /^v\d+\.\d+\.\d+$/.test(first)?`/${first}`:''}
+  function init(){
+    const base = (window.getVersionBase && typeof getVersionBase === 'function') ? getVersionBase() : getVersionBaseLocal();
+    const v = base ? base.replace('/','') : (window.AVFS_VERSION_ID || 'local');
+    const el = document.getElementById('version-badge'); if(el) el.textContent = v;
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
+
+function toggleVersionMenu() {
+  const menu = document.getElementById('version-menu');
+  if (!menu) return;
+  menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+}
+
+function renderVersionMenu() {
+  const container = document.getElementById('version-menu-list');
+  if (!container) return;
+  container.innerHTML = '<button class="btn" disabled>Loading versions…</button>';
+  fetch(versionedPath('/api/versions'))
+    .then(r => { if (!r.ok) throw new Error('Failed to load versions'); return r.json(); })
+    .then(data => {
+      const versions = data.available_versions || [];
+      const current = data.current_version || '';
+      if (!versions.length) {
+        container.innerHTML = '<button class="btn" disabled>No versions found</button>';
+        return;
+      }
+      container.innerHTML = versions.map(version => {
+        const label = version === current ? `${version} ✓` : version;
+        return `<button class="btn" onclick="navigateToVersion('${version}')">${label}</button>`;
+      }).join('');
+    })
+    .catch(err => {
+      console.warn('[AVFS] version menu load failed', err);
+      container.innerHTML = '<button class="btn" disabled>Unable to load versions</button>';
+    });
+}
+function navigateToVersion(version) {
+  const suffix = window.location.pathname.replace(/^\/v\d+\.\d+(?:\.\d+)?/, '') || '/dashboard';
+  window.location.href = `/${version}${suffix}`;
+}
+document.addEventListener('click', event => {
+  if (!event.target.closest('.version-switcher')) {
+    const menu = document.getElementById('version-menu');
+    if (menu) menu.style.display = 'none';
+  }
+});
+window.addEventListener('load', renderVersionMenu);
+</script>
+</body>
+</html>

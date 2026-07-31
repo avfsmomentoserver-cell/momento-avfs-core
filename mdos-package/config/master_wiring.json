@@ -1,0 +1,83 @@
+{
+  "master_configuration": {
+    "version": "1.0.0",
+    "description": "Unified entry point system wiring all configuration files together",
+    "system_status": "fully_wired",
+    "entry_point_system": {
+      "enabled": true,
+      "master_control": "./config/entry_points.json",
+      "all_configs_connected": true,
+      "cross_references": true,
+      "unified_behavior": true
+    }
+  },
+  "configuration_files": {
+    "environment": {
+      "path": "./config/env_config.json",
+      "wired_to_entry_points": true,
+      "entry_point_references": ["ENTRY_POINTS_CONFIG", "AGENT_CONFIG", "PROMPT_DEFAULTS"],
+      "system_integration": true
+    },
+    "agents": {
+      "path": "./config/agent_config.json",
+      "wired_to_entry_points": true,
+      "default_entry_point": "all_prompts",
+      "entry_point_sections": ["entry_points", "agent_wiring", "system_integration"],
+      "all_agents_entry_point_aware": true
+    },
+    "entry_points": {
+      "path": "./config/entry_points.json",
+      "master_config": true,
+      "system_configuration": {
+        "environment_config": "./config/env_config.json",
+        "agent_config": "./config/agent_config.json",
+        "workspace_config": "./mdos.workspace.json",
+        "prompt_defaults": "./config/prompt_defaults.json"
+      },
+      "cross_config_references": true,
+      "auto_wire_all": true
+    },
+    "prompt_defaults": {
+      "path": "./config/prompt_defaults.json",
+      "wired_to_entry_points": true,
+      "system_wiring": {
+        "entry_points_config": "./config/entry_points.json",
+        "agent_config": "./config/agent_config.json",
+        "environment_config": "./config/env_config.json",
+        "workspace_config": "./mdos.workspace.json"
+      },
+      "entry_point_aware": true,
+      "unified_configuration": true
+    },
+    "workspace": {
+      "path": "./mdos.workspace.json",
+      "integrated_with_entry_points": true,
+      "referenced_by": ["agent_config.json", "entry_points.json", "prompt_defaults.json"]
+    }
+  },
+  "wiring_verification": {
+    "all_files_wired": true,
+    "cross_config_validation": true,
+    "entry_point_awareness": true,
+    "system_integration": true,
+    "unified_entry_point_system": true,
+    "environment_integration": true,
+    "workspace_integration": true,
+    "agent_integration": true,
+    "skill_integration": true,
+    "prompt_integration": true
+  },
+  "behavior_configuration": {
+    "default_agent": "ag_admin",
+    "skill_first": true,
+    "agent_coordination": true,
+    "entry_point_aware": true,
+    "universal_rules": [
+      "All chat prompts use skills first, then fall back to project admin agent",
+      "Project admin agent coordinates all specialist agents",
+      "All configuration files are entry-point aware and cross-wired",
+      "Environment, workspace, agents, skills, and prompts are fully integrated",
+      "System uses unified entry point behavior for consistent interactions"
+    ]
+  }
+}

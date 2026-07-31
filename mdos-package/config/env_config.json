@@ -1,0 +1,28 @@
+{
+  "env": {
+    "MDOS_MODE": "local",
+    "DATA_DIR": "./data",
+    "DOCS_DIR": "./docs",
+    "WORKSPACE_FILE": "./mdos.workspace.json",
+    "DB_PATH": "./data/mdos.db",
+    "LOG_LEVEL": "info",
+    "ALLOW_NETWORK_IMPORT": false,
+    "ENTRY_POINTS_CONFIG": "./config/entry_points.json",
+    "AGENT_CONFIG": "./config/agent_config.json",
+    "PROMPT_DEFAULTS": "./config/prompt_defaults.json"
+  },
+  "entry_points": {
+    "enabled": true,
+    "default_config": "./config/entry_points.json",
+    "agent_config_reference": "./config/agent_config.json",
+    "prompt_defaults_reference": "./config/prompt_defaults.json",
+    "auto_wire": true,
+    "environment_integration": true
+  },
+  "system": {
+    "config_loading_order": ["env_config.json", "agent_config.json", "entry_points.json", "prompt_defaults.json"],
+    "cross_references": true,
+    "entry_point_aware": true
+  },
+  "notes": "This file configures local environment values for scripts and agents. Set ALLOW_NETWORK_IMPORT to true to enable POST-based imports. Entry points system is enabled and wired to all configuration files."
+}

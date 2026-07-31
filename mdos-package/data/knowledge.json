@@ -1,0 +1,67 @@
+[
+  {
+    "id": "kn_obs",
+    "title": "Observation Before Prediction",
+    "type": "Concept",
+    "summary": "Understand the present before reasoning about the future. Prediction without understanding is speculation.",
+    "tags": [
+      "philosophy",
+      "pipeline"
+    ],
+    "projectId": "prj_momento"
+  },
+  {
+    "id": "kn_kernel",
+    "title": "Momento Kernel",
+    "type": "Architecture",
+    "summary": "Stable foundation: Round Event Model, database layer, schema contracts, runtime, event bus, API contracts, engine registry.",
+    "tags": [
+      "kernel",
+      "core"
+    ],
+    "projectId": "prj_momento"
+  },
+  {
+    "id": "kn_immutable",
+    "title": "Immutable Raw Events",
+    "type": "Standard",
+    "summary": "Raw data is never edited. Corrections recorded separately. Enables replay, auditing, calibration, learning.",
+    "tags": [
+      "truth",
+      "data"
+    ],
+    "projectId": "prj_momento"
+  },
+  {
+    "id": "kn_engines",
+    "title": "Intelligence Engine Chain",
+    "type": "Pattern",
+    "summary": "Pattern -> DNA -> Similarity -> Probability -> Confidence -> Forecast. Each replaceable with clear contracts.",
+    "tags": [
+      "forecast",
+      "engines"
+    ],
+    "projectId": "prj_momento"
+  },
+  {
+    "id": "kn_explain",
+    "title": "Explainability Metadata",
+    "type": "Standard",
+    "summary": "Every prediction states inputs used, patterns detected, conclusion reasoning, confidence, and uncertainty drivers.",
+    "tags": [
+      "explainability"
+    ],
+    "projectId": "prj_momento"
+  },
+  {
+    "id": "kn_localprod",
+    "title": "Local vs Production Independence",
+    "type": "Standard",
+    "summary": "SQLite/local dev must always keep working when cloud (Vercel/Render/Supabase) support is added.",
+    "tags": [
+      "devops",
+      "config"
+    ],
+    "projectId": "prj_momento"
+  }
+]

@@ -1,0 +1,130 @@
+{
+  "system_wiring": {
+    "entry_points_config": "./config/entry_points.json",
+    "agent_config": "./config/agent_config.json",
+    "environment_config": "./config/env_config.json",
+    "workspace_config": "./mdos.workspace.json",
+    "all_configs_wired": true,
+    "entry_point_aware": true,
+    "unified_configuration": true
+  },
+  "prompt_defaults": {
+    "chat_prompts": {
+      "default_agent": "ag_admin",
+      "default_behavior": "skill_first",
+      "universal_rules": [
+        "Always attempt to use relevant skills first before falling back to general agent capabilities",
+        "Project admin agent (ag_admin) coordinates all interactions and delegates to specialist agents when needed",
+        "Skills have priority over general agent responses for specialized tasks",
+        "Agent coordination happens automatically when skills are insufficient",
+        "Prompts such as 'project admin', 'auto', 'admin', 'plan', or 'invent' trigger an automatic orchestration flow with planning, task breakdown, and delegation, but the system first gathers the required context and acceptance criteria before beginning full execution and full-control handover",
+        "All configurations are entry-point aware and cross-wired for unified behavior",
+        "The system can infer the likely language, environment, and toolchain from the prompt and choose appropriate agents and tools automatically",
+        "When a UI is already served elsewhere, the system should reuse the existing runtime and link the new UI to the same server rather than creating a duplicate setup"
+      ],
+      "entry_point_integration": {
+        "enabled": true,
+        "config_references": true,
+        "environment_aware": true,
+        "workspace_aware": true,
+        "agent_coordination": true
+      }
+    }
+  },
+  "skill_detection": {
+    "enabled": true,
+    "auto_detect": true,
+    "priority_skills": [
+      "web-dev",
+      "skill-creator",
+      "pdf",
+      "xlsx",
+      "general_purpose_task",
+      "search"
+    ],
+    "detection_rules": {
+      "web_requests": "web-dev",
+      "skill_creation": "skill-creator",
+      "pdf_processing": "pdf",
+      "excel_files": "xlsx",
+      "general_tasks": "general_purpose_task",
+      "codebase_search": "search"
+    }
+  },
+  "agent_hierarchy": {
+    "primary": "ag_admin",
+    "specialists": {
+      "ag_plugin_architect": [
+        "architecture",
+        "design",
+        "extensions"
+      ],
+      "ag_backend": [
+        "api",
+        "backend",
+        "services"
+      ],
+      "ag_frontend": [
+        "ui",
+        "frontend",
+        "dashboard"
+      ],
+      "ag_forecast": [
+        "prediction",
+        "forecast",
+        "analysis"
+      ]
+    },
+    "coordination_rules": [
+      "ag_admin coordinates all interactions",
+      "Specialist agents are invoked when skills are insufficient",
+      "Project context is preserved across agent transitions"
+    ]
+  },
+  "entry_point_configurations": {
+    "all_chat_prompts": {
+      "description": "Default configuration for all chat prompts",
+      "agent_id": "ag_admin",
+      "skills_enabled": true,
+      "skill_priority": "high",
+      "auto_skill_selection": true,
+      "agent_coordination": true,
+      "auto_delegate_to_agents": true,
+      "project_admin_primary": true,
+      "context_preservation": true,
+      "fallback_strategy": {
+        "order": [
+          "skills",
+          "project_admin",
+          "specialist_agents",
+          "general_purpose"
+        ],
+        "escalation": true
+      }
+    },
+    "project_admin_flow": {
+      "description": "Automatic orchestration flow for project administration prompts",
+      "agent_id": "ag_admin",
+      "skills_enabled": true,
+      "skill_priority": "high",
+      "auto_skill_selection": true,
+      "agent_coordination": true,
+      "auto_delegate_to_agents": true,
+      "auto_plan_and_assign": true,
+      "collect_requirements_first": true,
+      "context_preservation": true,
+      "execution_mode_toggle": true,
+      "low_credit_efficient": true,
+      "full_power": true,
+      "fallback_strategy": {
+        "order": [
+          "skills",
+          "project_admin",
+          "specialist_agents",
+          "general_purpose"
+        ],
+        "escalation": true
+      }
+    }
+  }
+}

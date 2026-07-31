@@ -1,0 +1,878 @@
+[
+  {
+    "id": "1",
+    "name": "backend",
+    "type": "folder",
+    "children": [
+      {
+        "id": "2",
+        "name": "requirements.txt",
+        "type": "file",
+        "extension": "txt"
+      },
+      {
+        "id": "3",
+        "name": "run_api.py",
+        "type": "file",
+        "extension": "py"
+      },
+      {
+        "id": "4",
+        "name": "momento",
+        "type": "folder",
+        "children": [
+          {
+            "id": "5",
+            "name": "__init__.py",
+            "type": "file",
+            "extension": "py"
+          },
+          {
+            "id": "6",
+            "name": "analysis.py",
+            "type": "file",
+            "extension": "py"
+          },
+          {
+            "id": "7",
+            "name": "auth.py",
+            "type": "file",
+            "extension": "py"
+          },
+          {
+            "id": "8",
+            "name": "autopilot.py",
+            "type": "file",
+            "extension": "py"
+          },
+          {
+            "id": "9",
+            "name": "config.py",
+            "type": "file",
+            "extension": "py"
+          },
+          {
+            "id": "10",
+            "name": "db.py",
+            "type": "file",
+            "extension": "py"
+          },
+          {
+            "id": "11",
+            "name": "feed.py",
+            "type": "file",
+            "extension": "py"
+          },
+          {
+            "id": "12",
+            "name": "forecast.py",
+            "type": "file",
+            "extension": "py"
+          },
+          {
+            "id": "13",
+            "name": "hub.py",
+            "type": "file",
+            "extension": "py"
+          },
+          {
+            "id": "14",
+            "name": "linguistics.py",
+            "type": "file",
+            "extension": "py"
+          },
+          {
+            "id": "15",
+            "name": "orchestrator.py",
+            "type": "file",
+            "extension": "py"
+          },
+          {
+            "id": "16",
+            "name": "plugins.py",
+            "type": "file",
+            "extension": "py"
+          },
+          {
+            "id": "17",
+            "name": "store.py",
+            "type": "file",
+            "extension": "py"
+          },
+          {
+            "id": "18",
+            "name": "watcher.py",
+            "type": "file",
+            "extension": "py"
+          }
+        ]
+      },
+      {
+        "id": "19",
+        "name": "api",
+        "type": "folder",
+        "children": [
+          {
+            "id": "20",
+            "name": "__init__.py",
+            "type": "file",
+            "extension": "py"
+          },
+          {
+            "id": "21",
+            "name": "app.py",
+            "type": "file",
+            "extension": "py"
+          },
+          {
+            "id": "22",
+            "name": "deps.py",
+            "type": "file",
+            "extension": "py"
+          },
+          {
+            "id": "23",
+            "name": "schemas.py",
+            "type": "file",
+            "extension": "py"
+          },
+          {
+            "id": "24",
+            "name": "routes",
+            "type": "folder",
+            "children": [
+              {
+                "id": "25",
+                "name": "__init__.py",
+                "type": "file",
+                "extension": "py"
+              },
+              {
+                "id": "26",
+                "name": "analysis.py",
+                "type": "file",
+                "extension": "py"
+              },
+              {
+                "id": "27",
+                "name": "core.py",
+                "type": "file",
+                "extension": "py"
+              },
+              {
+                "id": "28",
+                "name": "engines.py",
+                "type": "file",
+                "extension": "py"
+              },
+              {
+                "id": "29",
+                "name": "forecasts.py",
+                "type": "file",
+                "extension": "py"
+              },
+              {
+                "id": "30",
+                "name": "ingest.py",
+                "type": "file",
+                "extension": "py"
+              },
+              {
+                "id": "31",
+                "name": "market.py",
+                "type": "file",
+                "extension": "py"
+              },
+              {
+                "id": "32",
+                "name": "platform.py",
+                "type": "file",
+                "extension": "py"
+              },
+              {
+                "id": "33",
+                "name": "rounds.py",
+                "type": "file",
+                "extension": "py"
+              },
+              {
+                "id": "34",
+                "name": "users.py",
+                "type": "file",
+                "extension": "py"
+              },
+              {
+                "id": "35",
+                "name": "ws.py",
+                "type": "file",
+                "extension": "py"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "36",
+    "name": "docs",
+    "type": "folder",
+    "children": []
+  },
+  {
+    "id": "37",
+    "name": "downloads",
+    "type": "folder",
+    "children": []
+  },
+  {
+    "id": "38",
+    "name": "scripts",
+    "type": "folder",
+    "children": [
+      {
+        "id": "39",
+        "name": "build_bundles.py",
+        "type": "file",
+        "extension": "py"
+      },
+      {
+        "id": "40",
+        "name": "momento-api.service",
+        "type": "file",
+        "extension": "service"
+      },
+      {
+        "id": "41",
+        "name": "momento-receiver.service",
+        "type": "file",
+        "extension": "service"
+      }
+    ]
+  },
+  {
+    "id": "42",
+    "name": "web",
+    "type": "folder",
+    "children": [
+      {
+        "id": "43",
+        "name": "public",
+        "type": "folder",
+        "children": [
+          {
+            "id": "44",
+            "name": "favicon.png",
+            "type": "file",
+            "extension": "png"
+          },
+          {
+            "id": "45",
+            "name": "icon.png",
+            "type": "file",
+            "extension": "png"
+          },
+          {
+            "id": "46",
+            "name": "placeholder.svg",
+            "type": "file",
+            "extension": "svg"
+          },
+          {
+            "id": "47",
+            "name": "robots.txt",
+            "type": "file",
+            "extension": "txt"
+          }
+        ]
+      },
+      {
+        "id": "48",
+        "name": "src",
+        "type": "folder",
+        "children": [
+          {
+            "id": "49",
+            "name": "components",
+            "type": "folder",
+            "children": [
+              {
+                "id": "50",
+                "name": "charts",
+                "type": "folder",
+                "children": [
+                  {
+                    "id": "51",
+                    "name": "BandDistribution.tsx",
+                    "type": "file",
+                    "extension": "tsx"
+                  },
+                  {
+                    "id": "52",
+                    "name": "CandleChart.tsx",
+                    "type": "file",
+                    "extension": "tsx"
+                  },
+                  {
+                    "id": "53",
+                    "name": "EquityChart.tsx",
+                    "type": "file",
+                    "extension": "tsx"
+                  },
+                  {
+                    "id": "54",
+                    "name": "PhaseChart.tsx",
+                    "type": "file",
+                    "extension": "tsx"
+                  },
+                  {
+                    "id": "55",
+                    "name": "PointsChart.tsx",
+                    "type": "file",
+                    "extension": "tsx"
+                  }
+                ]
+              },
+              {
+                "id": "56",
+                "name": "console",
+                "type": "folder",
+                "children": [
+                  {
+                    "id": "57",
+                    "name": "ConnectionPill.tsx",
+                    "type": "file",
+                    "extension": "tsx"
+                  },
+                  {
+                    "id": "58",
+                    "name": "EmptyState.tsx",
+                    "type": "file",
+                    "extension": "tsx"
+                  },
+                  {
+                    "id": "59",
+                    "name": "Meter.tsx",
+                    "type": "file",
+                    "extension": "tsx"
+                  },
+                  {
+                    "id": "60",
+                    "name": "Panel.tsx",
+                    "type": "file",
+                    "extension": "tsx"
+                  },
+                  {
+                    "id": "61",
+                    "name": "Ring.tsx",
+                    "type": "file",
+                    "extension": "tsx"
+                  },
+                  {
+                    "id": "62",
+                    "name": "Sparkline.tsx",
+                    "type": "file",
+                    "extension": "tsx"
+                  },
+                  {
+                    "id": "63",
+                    "name": "StateBadge.tsx",
+                    "type": "file",
+                    "extension": "tsx"
+                  },
+                  {
+                    "id": "64",
+                    "name": "StatTile.tsx",
+                    "type": "file",
+                    "extension": "tsx"
+                  }
+                ]
+              },
+              {
+                "id": "65",
+                "name": "layout",
+                "type": "folder",
+                "children": [
+                  {
+                    "id": "66",
+                    "name": "AppShell.tsx",
+                    "type": "file",
+                    "extension": "tsx"
+                  },
+                  {
+                    "id": "67",
+                    "name": "Sidebar.tsx",
+                    "type": "file",
+                    "extension": "tsx"
+                  },
+                  {
+                    "id": "68",
+                    "name": "SourceSwitcher.tsx",
+                    "type": "file",
+                    "extension": "tsx"
+                  },
+                  {
+                    "id": "69",
+                    "name": "TopBar.tsx",
+                    "type": "file",
+                    "extension": "tsx"
+                  }
+                ]
+              },
+              {
+                "id": "70",
+                "name": "pages",
+                "type": "folder",
+                "children": [
+                  {
+                    "id": "71",
+                    "name": "app",
+                    "type": "folder",
+                    "children": [
+                      {
+                        "id": "72",
+                        "name": "AppCharts.tsx",
+                        "type": "file",
+                        "extension": "tsx"
+                      },
+                      {
+                        "id": "73",
+                        "name": "Premium.tsx",
+                        "type": "file",
+                        "extension": "tsx"
+                      },
+                      {
+                        "id": "74",
+                        "name": "ProPredictions.tsx",
+                        "type": "file",
+                        "extension": "tsx"
+                      },
+                      {
+                        "id": "75",
+                        "name": "Today.tsx",
+                        "type": "file",
+                        "extension": "tsx"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "76",
+                    "name": "auth",
+                    "type": "folder",
+                    "children": [
+                      {
+                        "id": "77",
+                        "name": "Login.tsx",
+                        "type": "file",
+                        "extension": "tsx"
+                      },
+                      {
+                        "id": "78",
+                        "name": "Register.tsx",
+                        "type": "file",
+                        "extension": "tsx"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "79",
+                    "name": "dashboard",
+                    "type": "folder",
+                    "children": [
+                      {
+                        "id": "80",
+                        "name": "Autopilot.tsx",
+                        "type": "file",
+                        "extension": "tsx"
+                      },
+                      {
+                        "id": "81",
+                        "name": "BirdEye.tsx",
+                        "type": "file",
+                        "extension": "tsx"
+                      },
+                      {
+                        "id": "82",
+                        "name": "BuildSteps.tsx",
+                        "type": "file",
+                        "extension": "tsx"
+                      },
+                      {
+                        "id": "83",
+                        "name": "CommandCenter.tsx",
+                        "type": "file",
+                        "extension": "tsx"
+                      },
+                      {
+                        "id": "84",
+                        "name": "DnaHunter.tsx",
+                        "type": "file",
+                        "extension": "tsx"
+                      },
+                      {
+                        "id": "85",
+                        "name": "ForecastStudio.tsx",
+                        "type": "file",
+                        "extension": "tsx"
+                      },
+                      {
+                        "id": "86",
+                        "name": "Ingest.tsx",
+                        "type": "file",
+                        "extension": "tsx"
+                      },
+                      {
+                        "id": "87",
+                        "name": "LadderDash.tsx",
+                        "type": "file",
+                        "extension": "tsx"
+                      },
+                      {
+                        "id": "88",
+                        "name": "Linguistics.tsx",
+                        "type": "file",
+                        "extension": "tsx"
+                      },
+                      {
+                        "id": "89",
+                        "name": "Market.tsx",
+                        "type": "file",
+                        "extension": "tsx"
+                      },
+                      {
+                        "id": "90",
+                        "name": "MoonshotFinder.tsx",
+                        "type": "file",
+                        "extension": "tsx"
+                      },
+                      {
+                        "id": "91",
+                        "name": "Resistance.tsx",
+                        "type": "file",
+                        "extension": "tsx"
+                      },
+                      {
+                        "id": "92",
+                        "name": "RoundTesting.tsx",
+                        "type": "file",
+                        "extension": "tsx"
+                      },
+                      {
+                        "id": "93",
+                        "name": "Settings.tsx",
+                        "type": "file",
+                        "extension": "tsx"
+                      },
+                      {
+                        "id": "94",
+                        "name": "Sources.tsx",
+                        "type": "file",
+                        "extension": "tsx"
+                      },
+                      {
+                        "id": "95",
+                        "name": "Users.tsx",
+                        "type": "file",
+                        "extension": "tsx"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "96",
+                    "name": "Index.tsx",
+                    "type": "file",
+                    "extension": "tsx"
+                  },
+                  {
+                    "id": "97",
+                    "name": "Inventory.tsx",
+                    "type": "file",
+                    "extension": "tsx"
+                  },
+                  {
+                    "id": "98",
+                    "name": "Landing.tsx",
+                    "type": "file",
+                    "extension": "tsx"
+                  },
+                  {
+                    "id": "99",
+                    "name": "NotFound.tsx",
+                    "type": "file",
+                    "extension": "tsx"
+                  },
+                  {
+                    "id": "100",
+                    "name": "Orchestrator.tsx",
+                    "type": "file",
+                    "extension": "tsx"
+                  }
+                ]
+              },
+              {
+                "id": "101",
+                "name": "panels",
+                "type": "folder",
+                "children": []
+              },
+              {
+                "id": "102",
+                "name": "state",
+                "type": "folder",
+                "children": [
+                  {
+                    "id": "103",
+                    "name": "AuthProvider.tsx",
+                    "type": "file",
+                    "extension": "tsx"
+                  },
+                  {
+                    "id": "104",
+                    "name": "PlatformProvider.tsx",
+                    "type": "file",
+                    "extension": "tsx"
+                  }
+                ]
+              },
+              {
+                "id": "105",
+                "name": "test",
+                "type": "folder",
+                "children": [
+                  {
+                    "id": "106",
+                    "name": "calendar.browser.test.tsx",
+                    "type": "file",
+                    "extension": "tsx"
+                  },
+                  {
+                    "id": "107",
+                    "name": "example.test.ts",
+                    "type": "file",
+                    "extension": "ts"
+                  }
+                ]
+              },
+              {
+                "id": "108",
+                "name": "App.css",
+                "type": "file",
+                "extension": "css"
+              },
+              {
+                "id": "109",
+                "name": "App.tsx",
+                "type": "file",
+                "extension": "tsx"
+              },
+              {
+                "id": "110",
+                "name": "index.css",
+                "type": "file",
+                "extension": "css"
+              },
+              {
+                "id": "111",
+                "name": "main.tsx",
+                "type": "file",
+                "extension": "tsx"
+              },
+              {
+                "id": "112",
+                "name": "vite-env.d.ts",
+                "type": "file",
+                "extension": "d.ts"
+              }
+            ]
+          },
+          {
+            "id": "113",
+            "name": ".gitignore",
+            "type": "file",
+            "extension": ""
+          },
+          {
+            "id": "114",
+            "name": "bun.lock",
+            "type": "file",
+            "extension": "lock"
+          },
+          {
+            "id": "115",
+            "name": "components.json",
+            "type": "file",
+            "extension": "json"
+          },
+          {
+            "id": "116",
+            "name": "eslint.config.js",
+            "type": "file",
+            "extension": "js"
+          },
+          {
+            "id": "117",
+            "name": "index.html",
+            "type": "file",
+            "extension": "html"
+          },
+          {
+            "id": "118",
+            "name": "package.json",
+            "type": "file",
+            "extension": "json"
+          },
+          {
+            "id": "119",
+            "name": "postcss.config.js",
+            "type": "file",
+            "extension": "js"
+          },
+          {
+            "id": "120",
+            "name": "tailwind.config.ts",
+            "type": "file",
+            "extension": "ts"
+          },
+          {
+            "id": "121",
+            "name": "tsconfig.app.json",
+            "type": "file",
+            "extension": "json"
+          },
+          {
+            "id": "122",
+            "name": "tsconfig.json",
+            "type": "file",
+            "extension": "json"
+          },
+          {
+            "id": "123",
+            "name": "tsconfig.node.json",
+            "type": "file",
+            "extension": "json"
+          },
+          {
+            "id": "124",
+            "name": "vite.config.ts",
+            "type": "file",
+            "extension": "ts"
+          },
+          {
+            "id": "125",
+            "name": "vitest.browser.config.ts",
+            "type": "file",
+            "extension": "ts"
+          },
+          {
+            "id": "126",
+            "name": "vitest.config.ts",
+            "type": "file",
+            "extension": "ts"
+          }
+        ]
+      },
+      {
+        "id": "127",
+        "name": ".gitignore",
+        "type": "file",
+        "extension": ""
+      },
+      {
+        "id": "128",
+        "name": "bun.lock",
+        "type": "file",
+        "extension": "lock"
+      },
+      {
+        "id": "129",
+        "name": "components.json",
+        "type": "file",
+        "extension": "json"
+      },
+      {
+        "id": "130",
+        "name": "eslint.config.js",
+        "type": "file",
+        "extension": "js"
+      },
+      {
+        "id": "131",
+        "name": "index.html",
+        "type": "file",
+        "extension": "html"
+      },
+      {
+        "id": "132",
+        "name": "package.json",
+        "type": "file",
+        "extension": "json"
+      },
+      {
+        "id": "133",
+        "name": "postcss.config.js",
+        "type": "file",
+        "extension": "js"
+      },
+      {
+        "id": "134",
+        "name": "tailwind.config.ts",
+        "type": "file",
+        "extension": "ts"
+      },
+      {
+        "id": "135",
+        "name": "tsconfig.app.json",
+        "type": "file",
+        "extension": "json"
+      },
+      {
+        "id": "136",
+        "name": "tsconfig.json",
+        "type": "file",
+        "extension": "json"
+      },
+      {
+        "id": "137",
+        "name": "tsconfig.node.json",
+        "type": "file",
+        "extension": "json"
+      },
+      {
+        "id": "138",
+        "name": "vite.config.ts",
+        "type": "file",
+        "extension": "ts"
+      },
+      {
+        "id": "139",
+        "name": "vitest.browser.config.ts",
+        "type": "file",
+        "extension": "ts"
+      },
+      {
+        "id": "140",
+        "name": "vitest.config.ts",
+        "type": "file",
+        "extension": "ts"
+      }
+    ]
+  },
+  {
+    "id": "141",
+    "name": ".gitignore",
+    "type": "file",
+    "extension": ""
+  },
+  {
+    "id": "142",
+    "name": "README.md",
+    "type": "file",
+    "extension": "md"
+  },
+  {
+    "id": "143",
+    "name": "rork.json",
+    "type": "file",
+    "extension": "json"
+  }
+]

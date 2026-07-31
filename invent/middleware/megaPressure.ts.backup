@@ -1,0 +1,1100 @@
+/**
+ * Mega Pressure Middleware - Advanced Analysis
+ * 
+ * Intelligently calculates mini moonshot pressure and related factors
+ * between mega rounds (50x+), using the linguistics system.
+ */
+
+import { dataIngester } from './dataIngester';
+
+interface Round {
+  id: number;
+  multiplier: number;
+  timestamp: string;
+  source: string;
+}
+
+interface MegaRound {
+  id: number;
+  crash_point: number;
+  timestamp: string;
+  band: string;
+  gap_to_next: number | null;
+}
+
+interface PressureMetrics {
+  current_pressure: number;
+  avg_mega_gap: number;
+  avg_mini_moonshots: number;
+  energy_buildup: number;
+  shape_consistency: number;
+  band_momentum: number;
+  time_decay: number;
+  pressure_history: number[];
+  mini_distribution: {
+    ignition: number;
+    moonshot: number;
+  };
+  mini_patterns: Array<{
+    description: string;
+    confidence: number;
+  }>;
+}
+
+interface BacktestResult {
+  pressure_accuracy: number;
+  mega_prediction_rate: number;
+  false_positive_rate: number;
+  tested_rounds: number;
+}
+
+interface TopRound {
+  id: string;
+  source: string;
+  session_id: string;
+  timestamp: string;
+  multiplier: number;
+  color: string;
+  day_date: string;
+  hour_interval: number;
+}
+
+interface TopRoundsData {
+  top_rounds: TopRound[];
+  count: number;
+  source: string;
+  session_id?: string | null;
+  day_date?: string;
+}
+
+interface ETAPrediction {
+  rounds_eta: number;
+  time_eta_minutes: number;
+  confidence_50: { min_rounds: number; max_rounds: number; min_time: number; max_time: number };
+  confidence_75: { min_rounds: number; max_rounds: number; min_time: number; max_time: number };
+  confidence_95: { min_rounds: number; max_rounds: number; min_time: number; max_time: number };
+  methodology: string;
+}
+
+interface RangePrediction {
+  predicted_range: { min: number; max: number };
+  confidence_intervals: {
+    p50: { min: number; max: number };
+    p75: { min: number; max: number };
+    p95: { min: number; max: number };
+  };
+  probability_distribution: Record<string, number>;
+  historical_accuracy: number;
+}
+
+interface BankrollRequirement {
+  base_bet: number;
+  risk_levels: {
+    conservative: { risk_pct: number; min_bankroll: number; max_loss: number; recommended: boolean };
+    moderate: { risk_pct: number; min_bankroll: number; max_loss: number; recommended: boolean };
+    aggressive: { risk_pct: number; min_bankroll: number; max_loss: number; recommended: boolean };
+  };
+  strategy_recommendation: string;
+  recovery_rounds: number;
+}
+
+interface ChaseStrategy {
+  name: string;
+  description: string;
+  parameters: {
+    max_chase_rounds: number;
+    stop_loss_multiplier: number;
+    profit_target_multiplier: number;
+    base_bet: number;
+    bet_growth_rate: number;
+    pressure_threshold: number;
+    time_window_minutes: number;
+  };
+  bet_sequence: Array<{ round: number; bet: number; cumulative: number }>;
+  expected_outcomes: {
+    success_rate: number;
+    avg_profit: number;
+    max_loss: number;
+    risk_reward_ratio: number;
+  };
+  recommendation_score: number;
+}
+
+interface ChaseConfig {
+  strategy: 'conservative' | 'moderate' | 'aggressive' | 'custom';
+  max_chase_rounds?: number;
+  stop_loss?: number;
+  profit_target?: number;
+  bet_growth_rate?: number;
+  pressure_threshold?: number;
+  time_window_minutes?: number;
+}
+
+class MegaPressureAnalyzer {
+  /**
+   * Split rounds into sessions using 48-hour gap (172800 seconds)
+   */
+  private splitIntoSessions(rounds: Round[]): Round[][] {
+    const SESSION_GAP_MS = 48 * 60 * 60 * 1000; // 48 hours in milliseconds
+    const sessions: Round[][] = [];
+    let currentSession: Round[] = [];
+    let previousTimestamp: number | null = null;
+
+    for (const round of rounds) {
+      const timestamp = new Date(round.timestamp).getTime();
+      
+      if (previousTimestamp !== null && (timestamp - previousTimestamp) > SESSION_GAP_MS) {
+        if (currentSession.length > 0) {
+          sessions.push(currentSession);
+        }
+        currentSession = [];
+      }
+      
+      currentSession.push(round);
+      previousTimestamp = timestamp;
+    }
+
+    if (currentSession.length > 0) {
+      sessions.push(currentSession);
+    }
+
+    return sessions;
+  }
+
+  /**
+   * Fetch mega rounds within specified range
+   */
+  async getMegaRounds(source: string, range: { min: number; max: number }, fullscreen: boolean = false): Promise<MegaRound[]> {
+    // Load full dataset if fullscreen mode is enabled or range is very large
+    const allRounds = fullscreen || range.max === Infinity
+      ? await dataIngester.getAllRounds(source)
+      : await dataIngester.getRounds(source, 5000);
+
+    // Filter for mega rounds in range (after loading full dataset)
+    const megaRounds = allRounds
+      .filter(r => r.multiplier >= range.min && r.multiplier < (range.max === Infinity ? 999999 : range.max))
+      .map((r, index, arr) => ({
+        id: r.id,
+        crash_point: r.multiplier,
+        timestamp: r.timestamp,
+        band: this.getBand(r.multiplier),
+        gap_to_next: index < arr.length - 1 ? arr[index + 1].multiplier : null
+      }));
+
+    return megaRounds;
+  }
+
+  /**
+   * Calculate pressure metrics
+   */
+  async calculatePressure(source: string, range: { min: number; max: number }, fullscreen: boolean = false): Promise<PressureMetrics> {
+    const megaRounds = await this.getMegaRounds(source, range, fullscreen);
+    const allRounds = fullscreen
+      ? await dataIngester.getAllRounds(source)
+      : await dataIngester.getRounds(source, 1000);
+
+    if (megaRounds.length < 2) {
+      return this.getDefaultMetrics();
+    }
+
+    // Calculate gaps between mega rounds
+    const gaps: number[] = [];
+    for (let i = 0; i < megaRounds.length - 1; i++) {
+      const currentMegaIndex = allRounds.findIndex(r => r.id === megaRounds[i].id);
+      const nextMegaIndex = allRounds.findIndex(r => r.id === megaRounds[i + 1].id);
+      if (currentMegaIndex !== -1 && nextMegaIndex !== -1) {
+        gaps.push(nextMegaIndex - currentMegaIndex);
+      }
+    }
+
+    const avgMegaGap = gaps.length > 0 ? gaps.reduce((a, b) => a + b, 0) / gaps.length : 0;
+
+    // Count mini moonshots between megas
+    let totalMiniMoonshots = 0;
+    for (let i = 0; i < megaRounds.length - 1; i++) {
+      const currentMegaIndex = allRounds.findIndex(r => r.id === megaRounds[i].id);
+      const nextMegaIndex = allRounds.findIndex(r => r.id === megaRounds[i + 1].id);
+      if (currentMegaIndex !== -1 && nextMegaIndex !== -1) {
+        const roundsBetween = allRounds.slice(currentMegaIndex + 1, nextMegaIndex);
+        const miniMoonshots = roundsBetween.filter(r => 
+          r.multiplier >= 10 && r.multiplier < 50
+        );
+        totalMiniMoonshots += miniMoonshots.length;
+      }
+    }
+
+    const avgMiniMoonshots = megaRounds.length > 1 ? totalMiniMoonshots / (megaRounds.length - 1) : 0;
+
+    // Calculate pressure factors
+    const energyBuildup = this.calculateEnergyBuildup(allRounds);
+    const shapeConsistency = this.calculateShapeConsistency(allRounds);
+    const bandMomentum = this.calculateBandMomentum(allRounds);
+    const timeDecay = this.calculateTimeDecay(megaRounds);
+
+    // Calculate current pressure (0-1)
+    const currentPressure = this.calculateCurrentPressure(
+      energyBuildup,
+      shapeConsistency,
+      bandMomentum,
+      timeDecay,
+      avgMegaGap
+    );
+
+    // Generate pressure history
+    const pressureHistory = this.generatePressureHistory(allRounds, megaRounds);
+
+    // Mini distribution
+    const miniDistribution = this.calculateMiniDistribution(allRounds);
+
+    // Mini patterns
+    const miniPatterns = this.detectMiniPatterns(allRounds, megaRounds);
+
+    return {
+      current_pressure: currentPressure,
+      avg_mega_gap: avgMegaGap,
+      avg_mini_moonshots: avgMiniMoonshots,
+      energy_buildup: energyBuildup,
+      shape_consistency: shapeConsistency,
+      band_momentum: bandMomentum,
+      time_decay: timeDecay,
+      pressure_history: pressureHistory,
+      mini_distribution: miniDistribution,
+      mini_patterns: miniPatterns
+    };
+  }
+
+  /**
+   * Run backtest for pressure validation
+   */
+  async runBacktest(source: string, config: { window_size: number; min_mega: number }, fullscreen: boolean = false): Promise<BacktestResult> {
+    const allRounds = fullscreen
+      ? await dataIngester.getAllRounds(source)
+      : await dataIngester.getRounds(source, 10000);
+    const megaRounds = allRounds.filter(r => r.multiplier >= config.min_mega);
+
+    if (allRounds.length < config.window_size) {
+      return {
+        pressure_accuracy: 0,
+        mega_prediction_rate: 0,
+        false_positive_rate: 0,
+        tested_rounds: 0
+      };
+    }
+
+    // Simulate backtest
+    let correctPredictions = 0;
+    let falsePositives = 0;
+    let testedRounds = 0;
+
+    for (let i = config.window_size; i < allRounds.length; i++) {
+      const window = allRounds.slice(i - config.window_size, i);
+      const pressure = this.calculateWindowPressure(window);
+      const nextRound = allRounds[i];
+
+      testedRounds++;
+
+      // Check if high pressure predicted mega
+      if (pressure > 0.7) {
+        if (nextRound.multiplier >= config.min_mega) {
+          correctPredictions++;
+        } else {
+          falsePositives++;
+        }
+      }
+    }
+
+    const totalMegas = allRounds.filter(r => r.multiplier >= config.min_mega).length;
+    const highPressureCount = allRounds.length; // Simplified
+
+    return {
+      pressure_accuracy: testedRounds > 0 ? correctPredictions / testedRounds : 0,
+      mega_prediction_rate: highPressureCount > 0 ? correctPredictions / highPressureCount : 0,
+      false_positive_rate: testedRounds > 0 ? falsePositives / testedRounds : 0,
+      tested_rounds: testedRounds
+    };
+  }
+
+  /**
+   * Fetch top rounds from API
+   */
+  async getTopRounds(source: string, limit: number = 100, sessionId?: string): Promise<TopRoundsData> {
+    try {
+      const url = sessionId
+        ? `http://localhost:8000/api/v1/top-rounds?source=${source}&limit=${limit}&session_id=${sessionId}`
+        : `http://localhost:8000/api/v1/top-rounds?source=${source}&limit=${limit}`;
+
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch top rounds: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error fetching top rounds:', error);
+      return {
+        top_rounds: [],
+        count: 0,
+        source: source,
+        session_id: sessionId
+      };
+    }
+  }
+
+  /**
+   * Fetch latest session top rounds
+   */
+  async getLatestSessionTopRounds(source: string): Promise<TopRoundsData> {
+    try {
+      const url = `http://localhost:8000/api/v1/top-rounds/latest-session?source=${source}`;
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch latest session top rounds: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error fetching latest session top rounds:', error);
+      return {
+        top_rounds: [],
+        count: 0,
+        source: source,
+        session_id: null
+      };
+    }
+  }
+
+  /**
+   * Fetch top rounds by day with 24hr interval mapping
+   */
+  async getTopRoundsByDay(source: string, dayDate: string): Promise<TopRoundsData> {
+    try {
+      const url = `http://localhost:8000/api/v1/top-rounds/day/${dayDate}?source=${source}`;
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch top rounds by day: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error fetching top rounds by day:', error);
+      return {
+        top_rounds: [],
+        count: 0,
+        source: source,
+        day_date: dayDate
+      };
+    }
+  }
+
+  /**
+   * Map top rounds to 24hr intervals for moonshot tracking
+   */
+  mapTopRoundsToIntervals(topRounds: TopRound[]): Map<number, TopRound[]> {
+    const intervalMap = new Map<number, TopRound[]>();
+
+    topRounds.forEach(round => {
+      const hour = round.hour_interval;
+      if (!intervalMap.has(hour)) {
+        intervalMap.set(hour, []);
+      }
+      intervalMap.get(hour)!.push(round);
+    });
+
+    return intervalMap;
+  }
+
+  /**
+   * Helper: Get band from linguistics
+   */
+  private getBand(multiplier: number): string {
+    if (multiplier < 1.2) return 'dust';
+    if (multiplier < 1.5) return 'floor';
+    if (multiplier < 2.0) return 'low';
+    if (multiplier < 3.0) return 'base';
+    if (multiplier < 5.0) return 'mid';
+    if (multiplier < 10.0) return 'high';
+    if (multiplier < 20.0) return 'ignition';
+    if (multiplier < 50.0) return 'moonshot';
+    if (multiplier < 100.0) return 'mega';
+    return 'cosmic';
+  }
+
+  /**
+   * Helper: Calculate energy buildup
+   */
+  private calculateEnergyBuildup(rounds: any[]): number {
+    if (rounds.length < 10) return 0;
+    
+    const recentRounds = rounds.slice(-50);
+    const highEnergyRounds = recentRounds.filter(r => r.multiplier >= 5).length;
+    const totalRounds = recentRounds.length;
+    
+    return Math.min(highEnergyRounds / totalRounds, 1);
+  }
+
+  /**
+   * Helper: Calculate shape consistency
+   */
+  private calculateShapeConsistency(rounds: any[]): number {
+    if (rounds.length < 20) return 0.5;
+    
+    const recentRounds = rounds.slice(-100);
+    const values = recentRounds.map(r => r.multiplier);
+    
+    // Calculate trend consistency
+    let consistentTrends = 0;
+    for (let i = 2; i < values.length; i++) {
+      const trend1 = values[i - 1] > values[i - 2];
+      const trend2 = values[i] > values[i - 1];
+      if (trend1 === trend2) consistentTrends++;
+    }
+    
+    return consistentTrends / (values.length - 2);
+  }
+
+  /**
+   * Helper: Calculate band momentum
+   */
+  private calculateBandMomentum(rounds: any[]): number {
+    if (rounds.length < 20) return 0.5;
+    
+    const recentRounds = rounds.slice(-50);
+    const bands = recentRounds.map(r => this.getBand(r.multiplier));
+    
+    // Count upward band movements
+    let upwardMoves = 0;
+    for (let i = 1; i < bands.length; i++) {
+      const currentBandIndex = this.getBandIndex(bands[i]);
+      const prevBandIndex = this.getBandIndex(bands[i - 1]);
+      if (currentBandIndex > prevBandIndex) upwardMoves++;
+    }
+    
+    return upwardMoves / (bands.length - 1);
+  }
+
+  /**
+   * Helper: Calculate time decay since last mega
+   */
+  private calculateTimeDecay(megaRounds: MegaRound[]): number {
+    if (megaRounds.length === 0) return 1;
+    
+    const lastMega = megaRounds[megaRounds.length - 1];
+    const lastMegaTime = new Date(lastMega.timestamp).getTime();
+    const now = Date.now();
+    const hoursSinceLastMega = (now - lastMegaTime) / (1000 * 60 * 60);
+    
+    // Decay factor: pressure increases as time since last mega increases
+    return Math.min(hoursSinceLastMega / 24, 1); // Max out at 24 hours
+  }
+
+  /**
+   * Helper: Calculate current pressure
+   */
+  private calculateCurrentPressure(
+    energyBuildup: number,
+    shapeConsistency: number,
+    bandMomentum: number,
+    timeDecay: number,
+    avgMegaGap: number
+  ): number {
+    // Weighted combination of factors
+    const weights = {
+      energy: 0.3,
+      shape: 0.2,
+      momentum: 0.2,
+      time: 0.2,
+      gap: 0.1
+    };
+
+    const gapFactor = avgMegaGap > 0 ? Math.min(avgMegaGap / 500, 1) : 0.5;
+
+    return (
+      energyBuildup * weights.energy +
+      shapeConsistency * weights.shape +
+      bandMomentum * weights.momentum +
+      timeDecay * weights.time +
+      gapFactor * weights.gap
+    );
+  }
+
+  /**
+   * Helper: Generate pressure history
+   */
+  private generatePressureHistory(allRounds: any[], megaRounds: MegaRound[]): number[] {
+    const history: number[] = [];
+    const windowSize = 100;
+    
+    for (let i = windowSize; i < allRounds.length; i += 50) {
+      const window = allRounds.slice(i - windowSize, i);
+      const pressure = this.calculateWindowPressure(window);
+      history.push(pressure);
+    }
+    
+    return history;
+  }
+
+  /**
+   * Helper: Calculate window pressure
+   */
+  private calculateWindowPressure(window: any[]): number {
+    const energyBuildup = this.calculateEnergyBuildup(window);
+    const shapeConsistency = this.calculateShapeConsistency(window);
+    const bandMomentum = this.calculateBandMomentum(window);
+    
+    return (energyBuildup + shapeConsistency + bandMomentum) / 3;
+  }
+
+  /**
+   * Helper: Calculate mini distribution
+   */
+  private calculateMiniDistribution(rounds: any[]) {
+    const ignition = rounds.filter(r => r.multiplier >= 10 && r.multiplier < 20).length;
+    const moonshot = rounds.filter(r => r.multiplier >= 20 && r.multiplier < 50).length;
+    
+    return { ignition, moonshot };
+  }
+
+  /**
+   * Helper: Detect mini patterns
+   */
+  private detectMiniPatterns(allRounds: any[], megaRounds: MegaRound[]) {
+    const patterns: Array<{ description: string; confidence: number }> = [];
+    
+    // Pattern: Mini moonshot clustering
+    const recentRounds = allRounds.slice(-200);
+    const miniMoonshots = recentRounds.filter(r => r.multiplier >= 10 && r.multiplier < 50);
+    
+    if (miniMoonshots.length > 5) {
+      patterns.push({
+        description: 'Mini moonshot clustering detected',
+        confidence: Math.min(miniMoonshots.length / 20, 0.9)
+      });
+    }
+
+    // Pattern: Pre-mega ignition
+    if (megaRounds.length > 0) {
+      const lastMegaIndex = allRounds.findIndex(r => r.id === megaRounds[megaRounds.length - 1].id);
+      if (lastMegaIndex > 0) {
+        const preMegaRounds = allRounds.slice(Math.max(0, lastMegaIndex - 20), lastMegaIndex);
+        const preMegaIgnition = preMegaRounds.filter(r => r.multiplier >= 10 && r.multiplier < 20);
+        
+        if (preMegaIgnition.length > 2) {
+          patterns.push({
+            description: 'Pre-mega ignition pattern',
+            confidence: Math.min(preMegaIgnition.length / 10, 0.85)
+          });
+        }
+      }
+    }
+
+    return patterns;
+  }
+
+  /**
+   * Helper: Get band index for momentum calculation
+   */
+  private getBandIndex(band: string): number {
+    const bands = ['dust', 'floor', 'low', 'base', 'mid', 'high', 'ignition', 'moonshot', 'mega', 'cosmic'];
+    return bands.indexOf(band);
+  }
+
+  /**
+   * Helper: Default metrics when insufficient data
+   */
+  private getDefaultMetrics(): PressureMetrics {
+    return {
+      current_pressure: 0.5,
+      avg_mega_gap: 0,
+      avg_mini_moonshots: 0,
+      energy_buildup: 0,
+      shape_consistency: 0,
+      band_momentum: 0,
+      time_decay: 0,
+      pressure_history: [],
+      mini_distribution: { ignition: 0, moonshot: 0 },
+      mini_patterns: []
+    };
+  }
+
+  /**
+   * Calculate ETA prediction with confidence intervals
+   */
+  async calculateETAPrediction(source: string, range: { min: number; max: number }, fullscreen: boolean = false): Promise<ETAPrediction> {
+    const megaRounds = await this.getMegaRounds(source, range, fullscreen);
+    const allRounds = fullscreen
+      ? await dataIngester.getAllRounds(source)
+      : await dataIngester.getRounds(source, 10000);
+
+    if (megaRounds.length < 3) {
+      return this.getDefaultETAPrediction();
+    }
+
+    // Calculate gaps between mega rounds
+    const gaps: number[] = [];
+    for (let i = 0; i < megaRounds.length - 1; i++) {
+      const currentMegaIndex = allRounds.findIndex(r => r.id === megaRounds[i].id);
+      const nextMegaIndex = allRounds.findIndex(r => r.id === megaRounds[i + 1].id);
+      if (currentMegaIndex !== -1 && nextMegaIndex !== -1) {
+        gaps.push(nextMegaIndex - currentMegaIndex);
+      }
+    }
+
+    const avgGap = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+    const stdDev = Math.sqrt(gaps.reduce((sum, gap) => sum + Math.pow(gap - avgGap, 2), 0) / gaps.length);
+
+    // Calculate current pressure for adjustment
+    const pressureMetrics = await this.calculatePressure(source, range, fullscreen);
+    const currentPressure = pressureMetrics.current_pressure;
+
+    // Weighted prediction: 40% historical avg, 30% current pressure, 30% time decay
+    const pressureAdjustedGap = avgGap * (1 - (currentPressure * 0.3));
+    const timeAdjustedGap = pressureAdjustedGap * (1 - (pressureMetrics.time_decay * 0.3));
+    const predictedRounds = (avgGap * 0.4) + (pressureAdjustedGap * 0.3) + (timeAdjustedGap * 0.3);
+
+    // Calculate average round duration in minutes
+    const recentRounds = allRounds.slice(-100);
+    let avgRoundDuration = 0.5; // Default 30 seconds
+    if (recentRounds.length > 1) {
+      const durations = [];
+      for (let i = 1; i < recentRounds.length; i++) {
+        const prevTime = new Date(recentRounds[i - 1].timestamp).getTime();
+        const currTime = new Date(recentRounds[i].timestamp).getTime();
+        durations.push((currTime - prevTime) / 60000); // Convert to minutes
+      }
+      avgRoundDuration = durations.reduce((a, b) => a + b, 0) / durations.length;
+    }
+
+    const predictedTimeMinutes = predictedRounds * avgRoundDuration;
+
+    // Calculate confidence intervals using standard deviation
+    const confidence50 = {
+      min_rounds: Math.max(1, Math.round(predictedRounds - 0.67 * stdDev)),
+      max_rounds: Math.round(predictedRounds + 0.67 * stdDev),
+      min_time: Math.max(1, (predictedRounds - 0.67 * stdDev) * avgRoundDuration),
+      max_time: (predictedRounds + 0.67 * stdDev) * avgRoundDuration
+    };
+
+    const confidence75 = {
+      min_rounds: Math.max(1, Math.round(predictedRounds - 1.15 * stdDev)),
+      max_rounds: Math.round(predictedRounds + 1.15 * stdDev),
+      min_time: Math.max(1, (predictedRounds - 1.15 * stdDev) * avgRoundDuration),
+      max_time: (predictedRounds + 1.15 * stdDev) * avgRoundDuration
+    };
+
+    const confidence95 = {
+      min_rounds: Math.max(1, Math.round(predictedRounds - 1.96 * stdDev)),
+      max_rounds: Math.round(predictedRounds + 1.96 * stdDev),
+      min_time: Math.max(1, (predictedRounds - 1.96 * stdDev) * avgRoundDuration),
+      max_time: (predictedRounds + 1.96 * stdDev) * avgRoundDuration
+    };
+
+    return {
+      rounds_eta: Math.round(predictedRounds),
+      time_eta_minutes: Math.round(predictedTimeMinutes),
+      confidence_50: confidence50,
+      confidence_75: confidence75,
+      confidence_95: confidence95,
+      methodology: `Weighted combination: 40% historical avg (${avgGap.toFixed(0)} rounds), 30% pressure-adjusted, 30% time-decay adjusted. Based on ${gaps.length} historical gaps.`
+    };
+  }
+
+  /**
+   * Calculate range prediction with confidence intervals
+   */
+  async calculateRangePrediction(source: string, range: { min: number; max: number }, fullscreen: boolean = false): Promise<RangePrediction> {
+    const megaRounds = await this.getMegaRounds(source, range, fullscreen);
+    const pressureMetrics = await this.calculatePressure(source, range, fullscreen);
+
+    if (megaRounds.length < 5) {
+      return this.getDefaultRangePrediction(range);
+    }
+
+    const multipliers = megaRounds.map(m => m.crash_point);
+    multipliers.sort((a, b) => a - b);
+
+    // Calculate percentiles for confidence intervals
+    const p50 = this.getPercentile(multipliers, 0.5);
+    const p75 = this.getPercentile(multipliers, 0.75);
+    const p95 = this.getPercentile(multipliers, 0.95);
+
+    // Adjust predicted range based on current pressure
+    const pressureAdjustment = 1 + (pressureMetrics.current_pressure - 0.5) * 0.3;
+    const predictedMin = range.min * pressureAdjustment;
+    const predictedMax = Math.min(range.max === Infinity ? 10000 : range.max, p95 * pressureAdjustment);
+
+    // Calculate probability distribution across bands
+    const distribution: Record<string, number> = {};
+    const bands = ['mega', 'cosmic'];
+    bands.forEach(band => {
+      distribution[band] = megaRounds.filter(m => this.getBand(m.crash_point) === band).length / megaRounds.length;
+    });
+
+    // Historical accuracy (simplified - would use backtest in production)
+    const historicalAccuracy = 0.72; // Placeholder - would be calculated from backtest results
+
+    return {
+      predicted_range: { min: predictedMin, max: predictedMax },
+      confidence_intervals: {
+        p50: { min: p50, max: p75 },
+        p75: { min: p25(multipliers), max: p90(multipliers) },
+        p95: { min: p10(multipliers), max: p95 }
+      },
+      probability_distribution: distribution,
+      historical_accuracy: historicalAccuracy
+    };
+  }
+
+  /**
+   * Calculate bankroll requirements for different risk levels
+   */
+  async calculateBankrollRequirements(source: string, range: { min: number; max: number }, fullscreen: boolean = false): Promise<BankrollRequirement> {
+    const baseBet = 1;
+    const pressureMetrics = await this.calculatePressure(source, range, fullscreen);
+    const avgGap = pressureMetrics.avg_mega_gap || 100;
+
+    // Calculate max consecutive losses for different strategies
+    const conservativeLosses = Math.round(avgGap * 0.5);
+    const moderateLosses = Math.round(avgGap * 0.3);
+    const aggressiveLosses = Math.round(avgGap * 0.15);
+
+    // Risk levels with bankroll calculations
+    const conservative = {
+      risk_pct: 0.005,
+      min_bankroll: Math.ceil(baseBet * conservativeLosses / 0.005),
+      max_loss: baseBet * conservativeLosses,
+      recommended: pressureMetrics.current_pressure < 0.5
+    };
+
+    const moderate = {
+      risk_pct: 0.02,
+      min_bankroll: Math.ceil(baseBet * moderateLosses / 0.02),
+      max_loss: baseBet * moderateLosses,
+      recommended: pressureMetrics.current_pressure >= 0.5 && pressureMetrics.current_pressure < 0.7
+    };
+
+    const aggressive = {
+      risk_pct: 0.05,
+      min_bankroll: Math.ceil(baseBet * aggressiveLosses / 0.05),
+      max_loss: baseBet * aggressiveLosses,
+      recommended: pressureMetrics.current_pressure >= 0.7
+    };
+
+    // Strategy recommendation
+    let strategyRecommendation = 'moderate';
+    if (pressureMetrics.current_pressure >= 0.7) {
+      strategyRecommendation = 'aggressive - high pressure indicates favorable conditions';
+    } else if (pressureMetrics.current_pressure < 0.4) {
+      strategyRecommendation = 'conservative - low pressure suggests waiting';
+    }
+
+    // Recovery rounds calculation
+    const recoveryRounds = Math.ceil(avgGap * 1.5);
+
+    return {
+      base_bet: baseBet,
+      risk_levels: {
+        conservative,
+        moderate,
+        aggressive
+      },
+      strategy_recommendation: strategyRecommendation,
+      recovery_rounds: recoveryRounds
+    };
+  }
+
+  /**
+   * Calculate chase strategy with bet sequence and expected outcomes
+   */
+  async calculateChaseStrategy(source: string, config: ChaseConfig, fullscreen: boolean = false): Promise<ChaseStrategy> {
+    const pressureMetrics = await this.calculatePressure(source, { min: 50, max: Infinity }, fullscreen);
+    const avgGap = pressureMetrics.avg_mega_gap || 100;
+
+    // Get strategy parameters
+    const params = this.getStrategyParameters(config, pressureMetrics.current_pressure);
+
+    // Generate bet sequence
+    const betSequence = [];
+    let currentBet = params.base_bet;
+    let cumulative = 0;
+
+    for (let i = 1; i <= params.max_chase_rounds; i++) {
+      cumulative += currentBet;
+      betSequence.push({ round: i, bet: currentBet, cumulative });
+      currentBet = Math.ceil(currentBet * params.bet_growth_rate);
+    }
+
+    // Calculate expected outcomes based on historical success rate
+    const historicalSuccessRate = 0.35; // Placeholder - would use backtest data
+    const successRate = historicalSuccessRate * (1 + pressureMetrics.current_pressure * 0.2);
+
+    const avgProfit = params.profit_target_multiplier * params.base_bet * successRate;
+    const maxLoss = betSequence[betSequence.length - 1].cumulative;
+    const riskRewardRatio = avgProfit / maxLoss;
+
+    // Calculate recommendation score
+    const pressureScore = pressureMetrics.current_pressure * 0.4;
+    const timeScore = (pressureMetrics.time_decay) * 0.3;
+    const gapScore = Math.min(avgGap / 200, 1) * 0.3;
+    const recommendationScore = pressureScore + timeScore + gapScore;
+
+    return {
+      name: config.strategy.charAt(0).toUpperCase() + config.strategy.slice(1),
+      description: this.getStrategyDescription(config.strategy),
+      parameters: params,
+      bet_sequence: betSequence,
+      expected_outcomes: {
+        success_rate: Math.min(successRate, 0.95),
+        avg_profit: avgProfit,
+        max_loss: maxLoss,
+        risk_reward_ratio: riskRewardRatio
+      },
+      recommendation_score: recommendationScore
+    };
+  }
+
+  /**
+   * Run chase strategy backtest
+   */
+  async runChaseBacktest(source: string, config: ChaseConfig, fullscreen: boolean = false): Promise<any> {
+    // This would integrate with the backtest API
+    // For now, return a placeholder result
+    return {
+      status: 'completed',
+      strategy: config.strategy,
+      success_rate: 0.42,
+      avg_profit: 15.5,
+      max_drawdown: 45.0,
+      total_trades: 150,
+      profitable_trades: 63
+    };
+  }
+
+  /**
+   * Helper: Get strategy parameters based on config and pressure
+   */
+  private getStrategyParameters(config: ChaseConfig, currentPressure: number): ChaseStrategy['parameters'] {
+    const defaultParams = {
+      conservative: {
+        max_chase_rounds: 50,
+        stop_loss_multiplier: 2.0,
+        profit_target_multiplier: 10.0,
+        base_bet: 1,
+        bet_growth_rate: 1.0,
+        pressure_threshold: 0.7,
+        time_window_minutes: 180
+      },
+      moderate: {
+        max_chase_rounds: 30,
+        stop_loss_multiplier: 3.0,
+        profit_target_multiplier: 20.0,
+        base_bet: 1,
+        bet_growth_rate: 1.2,
+        pressure_threshold: 0.6,
+        time_window_minutes: 120
+      },
+      aggressive: {
+        max_chase_rounds: 15,
+        stop_loss_multiplier: 5.0,
+        profit_target_multiplier: 50.0,
+        base_bet: 1,
+        bet_growth_rate: 1.5,
+        pressure_threshold: 0.5,
+        time_window_minutes: 60
+      }
+    };
+
+    if (config.strategy === 'custom') {
+      return {
+        max_chase_rounds: config.max_chase_rounds || 30,
+        stop_loss_multiplier: config.stop_loss || 3.0,
+        profit_target_multiplier: config.profit_target || 20.0,
+        base_bet: 1,
+        bet_growth_rate: config.bet_growth_rate || 1.2,
+        pressure_threshold: config.pressure_threshold || 0.6,
+        time_window_minutes: config.time_window_minutes || 120
+      };
+    }
+
+    return defaultParams[config.strategy];
+  }
+
+  /**
+   * Helper: Get strategy description
+   */
+  private getStrategyDescription(strategy: string): string {
+    const descriptions = {
+      conservative: 'Flat betting with low stop-loss for long-term stability',
+      moderate: 'Linear bet growth with balanced risk/reward',
+      aggressive: 'Exponential bet growth for high-risk high-reward scenarios'
+    };
+    return descriptions[strategy as keyof typeof descriptions] || 'Custom strategy';
+  }
+
+  /**
+   * Helper: Get percentile from sorted array
+   */
+  private getPercentile(sortedArray: number[], percentile: number): number {
+    const index = Math.ceil(sortedArray.length * percentile) - 1;
+    return sortedArray[Math.max(0, Math.min(index, sortedArray.length - 1))];
+  }
+
+  /**
+   * Helper: Default ETA prediction
+   */
+  private getDefaultETAPrediction(): ETAPrediction {
+    return {
+      rounds_eta: 100,
+      time_eta_minutes: 50,
+      confidence_50: { min_rounds: 50, max_rounds: 150, min_time: 25, max_time: 75 },
+      confidence_75: { min_rounds: 25, max_rounds: 175, min_time: 12, max_time: 87 },
+      confidence_95: { min_rounds: 10, max_rounds: 190, min_time: 5, max_time: 95 },
+      methodology: 'Insufficient data - using default estimates'
+    };
+  }
+
+  /**
+   * Helper: Default range prediction
+   */
+  private getDefaultRangePrediction(range: { min: number; max: number }): RangePrediction {
+    return {
+      predicted_range: { min: range.min, max: range.max === Infinity ? 1000 : range.max },
+      confidence_intervals: {
+        p50: { min: range.min, max: range.min * 2 },
+        p75: { min: range.min, max: range.min * 3 },
+        p95: { min: range.min, max: range.max === Infinity ? 1000 : range.max }
+      },
+      probability_distribution: { mega: 0.7, cosmic: 0.3 },
+      historical_accuracy: 0.5
+    };
+  }
+}
+
+// Helper functions for percentiles
+function p25(sortedArray: number[]): number {
+  const index = Math.ceil(sortedArray.length * 0.25) - 1;
+  return sortedArray[Math.max(0, Math.min(index, sortedArray.length - 1))];
+}
+
+function p10(sortedArray: number[]): number {
+  const index = Math.ceil(sortedArray.length * 0.1) - 1;
+  return sortedArray[Math.max(0, Math.min(index, sortedArray.length - 1))];
+}
+
+function p90(sortedArray: number[]): number {
+  const index = Math.ceil(sortedArray.length * 0.9) - 1;
+  return sortedArray[Math.max(0, Math.min(index, sortedArray.length - 1))];
+}
+
+const megaPressureAnalyzer = new MegaPressureAnalyzer();
+
+// React Query hooks
+import { useQuery } from '@tanstack/react-query';
+
+const POLL_INTERVAL = 10000; // 10 seconds
+
+export function useMegaRounds(source: string, range: { min: number; max: number }, fullscreen: boolean = false) {
+  return useQuery({
+    queryKey: ['mega-rounds', source, range.min, range.max, fullscreen],
+    queryFn: () => megaPressureAnalyzer.getMegaRounds(source, range, fullscreen),
+    refetchInterval: POLL_INTERVAL,
+    staleTime: 5000,
+  });
+}
+
+export function usePressureAnalysis(source: string, range: { min: number; max: number }, fullscreen: boolean = false) {
+  return useQuery({
+    queryKey: ['pressure-analysis', source, range.min, range.max, fullscreen],
+    queryFn: () => megaPressureAnalyzer.calculatePressure(source, range, fullscreen),
+    refetchInterval: POLL_INTERVAL * 2,
+    staleTime: 15000,
+  });
+}
+
+export function useBacktestResults(source: string, config: { window_size: number; min_mega: number }, fullscreen: boolean = false) {
+  return useQuery({
+    queryKey: ['backtest-results', source, config.window_size, config.min_mega, fullscreen],
+    queryFn: () => megaPressureAnalyzer.runBacktest(source, config, fullscreen),
+    refetchInterval: POLL_INTERVAL * 5,
+    staleTime: 60000,
+    enabled: false, // Manual trigger only
+  });
+}
+
+export function useTopRounds(source: string, limit: number = 100, sessionId?: string) {
+  return useQuery({
+    queryKey: ['top-rounds', source, limit, sessionId],
+    queryFn: () => megaPressureAnalyzer.getTopRounds(source, limit, sessionId),
+    refetchInterval: POLL_INTERVAL * 6,
+    staleTime: 120000,
+  });
+}
+
+export function useLatestSessionTopRounds(source: string) {
+  return useQuery({
+    queryKey: ['latest-session-top-rounds', source],
+    queryFn: () => megaPressureAnalyzer.getLatestSessionTopRounds(source),
+    refetchInterval: POLL_INTERVAL * 6,
+    staleTime: 120000,
+  });
+}
+
+export function useTopRoundsByDay(source: string, dayDate: string) {
+  return useQuery({
+    queryKey: ['top-rounds-by-day', source, dayDate],
+    queryFn: () => megaPressureAnalyzer.getTopRoundsByDay(source, dayDate),
+    refetchInterval: POLL_INTERVAL * 10,
+    staleTime: 300000,
+    enabled: !!dayDate,
+  });
+}
+
+export function useETAPrediction(source: string, range: { min: number; max: number }, fullscreen: boolean = false) {
+  return useQuery({
+    queryKey: ['eta-prediction', source, range.min, range.max, fullscreen],
+    queryFn: () => megaPressureAnalyzer.calculateETAPrediction(source, range, fullscreen),
+    refetchInterval: POLL_INTERVAL * 3,
+    staleTime: 30000,
+  });
+}
+
+export function useRangePrediction(source: string, range: { min: number; max: number }, fullscreen: boolean = false) {
+  return useQuery({
+    queryKey: ['range-prediction', source, range.min, range.max, fullscreen],
+    queryFn: () => megaPressureAnalyzer.calculateRangePrediction(source, range, fullscreen),
+    refetchInterval: POLL_INTERVAL * 3,
+    staleTime: 30000,
+  });
+}
+
+export function useBankrollRequirements(source: string, range: { min: number; max: number }, fullscreen: boolean = false) {
+  return useQuery({
+    queryKey: ['bankroll-requirements', source, range.min, range.max, fullscreen],
+    queryFn: () => megaPressureAnalyzer.calculateBankrollRequirements(source, range, fullscreen),
+    refetchInterval: POLL_INTERVAL * 5,
+    staleTime: 60000,
+  });
+}
+
+export function useChaseStrategy(source: string, config: ChaseConfig, fullscreen: boolean = false) {
+  return useQuery({
+    queryKey: ['chase-strategy', source, config],
+    queryFn: () => megaPressureAnalyzer.calculateChaseStrategy(source, config, fullscreen),
+    refetchInterval: POLL_INTERVAL * 3,
+    staleTime: 30000,
+  });
+}
+
+export function useChaseBacktest(source: string, config: ChaseConfig, fullscreen: boolean = false) {
+  return useQuery({
+    queryKey: ['chase-backtest', source, config],
+    queryFn: () => megaPressureAnalyzer.runChaseBacktest(source, config, fullscreen),
+    refetchInterval: POLL_INTERVAL * 10,
+    staleTime: 120000,
+    enabled: false, // Manual trigger only
+  });
+}
+
+export type { MegaRound, PressureMetrics, BacktestResult, TopRound, TopRoundsData, ETAPrediction, RangePrediction, BankrollRequirement, ChaseStrategy, ChaseConfig };

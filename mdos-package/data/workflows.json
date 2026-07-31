@@ -1,0 +1,52 @@
+[
+  {
+    "id": "wf_task",
+    "name": "Standard Task",
+    "stages": [
+      "Understand",
+      "Design",
+      "Implement",
+      "Test",
+      "Document",
+      "Review"
+    ],
+    "outputs": "Working, tested, documented change that preserves compatibility."
+  },
+  {
+    "id": "wf_feature",
+    "name": "New Feature",
+    "stages": [
+      "Purpose",
+      "Necessity",
+      "Separation",
+      "Measurement",
+      "Evolution",
+      "Implement"
+    ],
+    "outputs": "Approved feature that fits Core or lives as an extension."
+  },
+  {
+    "id": "wf_arch",
+    "name": "Architecture Review",
+    "stages": [
+      "Read current",
+      "Find weaknesses",
+      "Design target",
+      "ADR",
+      "Migration plan"
+    ],
+    "outputs": "Accepted ADR and migration strategy."
+  },
+  {
+    "id": "wf_deploy",
+    "name": "Deployment",
+    "stages": [
+      "Build",
+      "Validate",
+      "Stage",
+      "Promote",
+      "Monitor"
+    ],
+    "outputs": "Reproducible deploy across local and cloud."
+  }
+]

@@ -1,0 +1,42 @@
+[
+  {
+    "id": "t1",
+    "title": "Define Round Event Model & schema contracts",
+    "agentId": "ag_arch",
+    "projectId": "prj_momento",
+    "priority": "high",
+    "status": "doing"
+  },
+  {
+    "id": "t2",
+    "title": "Implement Collector heartbeat + reconnect",
+    "agentId": "ag_collector",
+    "projectId": "prj_momento",
+    "priority": "high",
+    "status": "todo"
+  },
+  {
+    "id": "t3",
+    "title": "Build /rounds, /rounds/latest, /rounds/history APIs",
+    "agentId": "ag_backend",
+    "projectId": "prj_momento",
+    "priority": "medium",
+    "status": "todo"
+  },
+  {
+    "id": "t4",
+    "title": "Forecast card with confidence + explanation",
+    "agentId": "ag_forecast",
+    "projectId": "prj_momento",
+    "priority": "medium",
+    "status": "todo"
+  },
+  {
+    "id": "t5",
+    "title": "Write replay tests for immutable events",
+    "agentId": "ag_qa",
+    "projectId": "prj_momento",
+    "priority": "medium",
+    "status": "todo"
+  }
+]

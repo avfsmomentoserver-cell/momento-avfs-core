@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.venv/
+venv/
+.env
+.DS_Store
+*.log
+dist/
+build/
+node_modules/
+data/mdos.db

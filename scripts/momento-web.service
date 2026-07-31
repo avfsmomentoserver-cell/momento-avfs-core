@@ -1,0 +1,26 @@
+[Unit]
+Description=Momento Core / AVFS Web Dashboard
+After=network-online.target momento-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=momento
+Group=momento
+WorkingDirectory=/opt/momento/web
+Environment="NODE_ENV=production"
+ExecStart=/usr/bin/npm run dev
+Restart=always
+RestartSec=5
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/var/lib/momento /var/log/momento
+
+StandardOutput=append:/var/log/momento/web.log
+StandardError=append:/var/log/momento/web.err
+
+[Install]
+WantedBy=multi-user.target

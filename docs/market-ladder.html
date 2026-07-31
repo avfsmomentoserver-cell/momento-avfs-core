@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ladder & Resistance - Forex Chart</title>
+<script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+:root{
+  --bg:#0b0b0f;--panel:#13131a;--border:#1e1e2e;
+  --accent:#7c3aed;--green:#22c55e;--red:#ef4444;
+  --gold:#f59e0b;--blue:#38bdf8;
+  --text:#dde1f0;--muted:#4a5070;--dim:#8891b0;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:12px;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+
+/* Nav */
+nav{display:flex;align-items:center;gap:12px;padding:8px 16px;background:var(--panel);border-bottom:1px solid var(--border)}
+nav h1{font-size:14px;font-weight:700;color:var(--accent);letter-spacing:.5px}
+nav .menu{display:flex;gap:8px;margin-left:auto}
+nav .menu a{padding:6px 12px;background:none;border:1px solid var(--border);color:var(--dim);text-decoration:none;border-radius:4px;font-size:11px;transition:all .2s;cursor:pointer}
+nav .menu a:hover,nav .menu a.active{border-color:var(--accent);color:var(--accent);background:var(--accent);color:#000}
+
+/* Main layout */
+.main{display:grid;grid-template-columns:1fr 280px;flex:1;min-height:0;overflow:hidden;gap:1px;background:var(--border)}
+
+/* Chart area */
+#chart{grid-column:1;background:var(--bg);min-height:0;position:relative}
+
+/* Right panel */
+.panel{display:flex;flex-direction:column;background:var(--panel);border-left:1px solid var(--border);overflow:hidden}
+
+/* Sections */
+.section{padding:12px;border-bottom:1px solid var(--border);flex-shrink:0;overflow-y:auto}
+.section.grow{flex:1;overflow-y:auto}
+
+.title{font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px;font-weight:600}
+
+/* Metrics */
+.metric{display:flex;justify-content:space-between;margin-bottom:6px;font-size:11px}
+.metric .label{color:var(--dim)}
+.metric .value{font-weight:600;color:var(--text);font-family:monospace}
+.metric .value.up{color:var(--green)}
+.metric .value.down{color:var(--red)}
+.metric .value.gold{color:var(--gold)}
+
+/* Ladder display */
+.ladder-box{background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:6px;margin-bottom:6px;font-size:10px}
+.ladder-box.active-asc{border-color:var(--green);background:#0a2010}
+.ladder-box.active-col{border-color:var(--red);background:#2a0a0a}
+.ladder-label{color:var(--muted);margin-bottom:4px;text-transform:uppercase;font-size:9px}
+.ladder-stat{display:flex;justify-content:space-between;margin-bottom:2px;color:var(--text)}
+.ladder-stat .val{font-family:monospace;font-weight:600}
+
+/* Phase bars */
+.phase-bar{display:flex;align-items:center;height:20px;border-radius:3px;padding:0 8px;margin-bottom:4px;font-size:9px;font-weight:600}
+.phase-bar.ascending{background:#0a2010;color:var(--green);border:1px solid var(--green)}
+.phase-bar.collapse{background:#2a0a0a;color:var(--red);border:1px solid var(--red)}
+.phase-bar.resistance{background:#1a0a2a;color:var(--gold);border:1px solid var(--gold)}
+.phase-bar.normal{background:var(--border);color:var(--dim);border:1px solid var(--border)}
+
+/* Stats grid */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:9px}
+.stat-item{background:var(--bg);padding:6px;border-radius:3px;border-left:2px solid var(--border)}
+.stat-item .label{color:var(--dim);font-size:8px;text-transform:uppercase}
+.stat-item .value{font-weight:600;margin-top:2px;color:var(--text);font-family:monospace}
+
+/* Buttons */
+.btn{padding:6px 12px;background:var(--border);border:1px solid var(--border);color:var(--text);border-radius:4px;cursor:pointer;font-size:10px;transition:all .2s;margin-right:4px}
+.btn:hover{background:var(--accent);color:#000;border-color:var(--accent)}
+.btn-group{display:flex;gap:4px;margin-top:8px;flex-wrap:wrap}
+
+/* Legend */
+.legend{display:flex;flex-direction:column;gap:4px;font-size:9px}
+.legend-item{display:flex;align-items:center;gap:6px}
+.legend-dot{width:12px;height:12px;border-radius:3px;flex-shrink:0}
+
+/* Source switcher */
+.source-switcher{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-left:8px}
+.source-switcher .btn{padding:5px 8px;font-size:10px}
+.source-switcher .btn.active{border-color:var(--accent);color:var(--accent)}
+</style>
+<script src="game-context/game-source.js"></script>
+</head>
+<body>
+
+<nav>
+  <h1>AVFS Ladder & Resistance</h1>
+  <div class="menu">
+    <a href="/">📊 Dashboard</a>
+    <a href="/avfs/dashboard/">AVFS Home</a>
+    <a href="./market">📈 Market</a>
+    <a href="./ladder-resistance" class="active">🎯 Ladder</a>
+    <div class="source-switcher" id="source-switcher" style="margin-left:8px"></div>
+    <div id="version-badge" class="version-badge" style="margin-left:8px;padding:6px 8px;border-radius:8px;background:#111; color:#ddd;font-size:11px">loading</div>
+    <div class="version-switcher" style="position:relative;display:inline-block;margin-left:10px">
+      <button class="btn" onclick="toggleVersionMenu()">Version</button>
+      <div id="version-menu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:8px;min-width:180px;z-index:50;box-shadow:0 12px 30px rgba(0,0,0,.25)">
+        <div id="version-menu-list"><button class="btn" disabled>Loading versions…</button></div>
+      </div>
+    </div>
+    <a onclick="alert('📖 User Guide: /docs/USER.md\n📋 System Docs: /docs/SYSTEM.md')">ℹ️ Help</a>
+  </div>
+</nav>
+
+<div class="main">
+  <div id="chart"></div>
+  
+  <div class="panel">
+    <!-- Current Phase -->
+    <div class="section">
+      <div class="title">Session Phase</div>
+      <div id="phase-display" class="phase-bar normal">Loading...</div>
+      <div class="metric">
+        <span class="label">Session Len</span>
+        <span class="value" id="session-len">—</span>
+      </div>
+          <div id="range-controls" style="margin-top:8px">
+            <div class="title">Display Range</div>
+            <div class="btn-group" style="margin-top:6px;margin-bottom:6px">
+              <button class="btn range-btn active" data-range="full" onclick="setLadderDisplayRange(null)">Full</button>
+              <button class="btn range-btn" data-range="200" onclick="setLadderDisplayRange(200)">200</button>
+              <button class="btn range-btn" data-range="100" onclick="setLadderDisplayRange(100)">100</button>
+              <button class="btn range-btn" data-range="50" onclick="setLadderDisplayRange(50)">50</button>
+              <button class="btn range-btn" data-range="20" onclick="setLadderDisplayRange(20)">20</button>
+            </div>
+          </div>
+      <div class="metric">
+        <span class="label">Price Range</span>
+        <span class="value" id="price-range">—</span>
+      </div>
+    </div>
+    
+    <!-- Ascending Ladder -->
+    <div class="section">
+      <div class="title">Ascending Ladder</div>
+      <div id="asc-ladder-box" class="ladder-box">
+        <div class="ladder-label">—</div>
+      </div>
+    </div>
+    
+    <!-- Collapse Ladder -->
+    <div class="section">
+      <div class="title">Collapse Ladder</div>
+      <div id="col-ladder-box" class="ladder-box">
+        <div class="ladder-label">—</div>
+      </div>
+    </div>
+    
+    <!-- Resistance -->
+    <div class="section">
+      <div id="mega-scores" style="margin-top:6px">
+        <div class="title">Mega Moonshot Scores</div>
+        <div id="mega-scores-body" class="ladder-box" style="font-size:11px">Calculating…</div>
+      </div>
+      <div class="title">Resistance</div>
+      <div id="resistance-box" style="font-size:10px">
+        <div style="color:var(--dim)">—</div>
+      </div>
+    </div>
+    
+    <!-- Phase Summary -->
+    <div class="section grow">
+      <div class="title">Phase Distribution</div>
+      <div class="stat-grid">
+        <div class="stat-item">
+          <div class="label">Ascending</div>
+          <div class="value" id="phase-count-asc" style="color:var(--green)">0</div>
+        </div>
+        <div class="stat-item">
+          <div class="label">Collapse</div>
+          <div class="value" id="phase-count-col" style="color:var(--red)">0</div>
+        </div>
+        <div class="stat-item">
+          <div class="label">Resistance</div>
+          <div class="value" id="phase-count-res" style="color:var(--gold)">0</div>
+        </div>
+        <div class="stat-item">
+          <div class="label">Normal</div>
+          <div class="value" id="phase-count-norm">0</div>
+        </div>
+      </div>
+      
+      <div class="title" style="margin-top:12px">Legend</div>
+      <div class="legend">
+        <div class="legend-item">
+          <div class="legend-dot" style="background:var(--blue)"></div>
+          <span style="color:var(--text)">— Multiplier line</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:var(--green)"></div>
+          <span>▲ Ascending: floor + uptrend (dashed)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:var(--red)"></div>
+          <span>▼ Collapse: ceiling + downtrend (dashed)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:var(--gold)"></div>
+          <span>◆ Resistance: upper/lower levels</span>
+        </div>
+        <div style="margin-top:6px;font-size:8px;color:var(--muted);line-height:1.5">
+          Use ←/→ keys to step through rounds.<br>
+          Markers show phase transitions.<br>
+          Dashed lines = strength (0–1 scale).
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+console.log('[LadderChart] Initializing with improved timeframes & logic...');
+
+function getVersionBase() {
+  const segments = window.location.pathname.split('/').filter(Boolean);
+  const first = segments[0] || '';
+  return /^v\d+\.\d+(?:\.\d+)?$/.test(first) ? `/${first}` : '';
+}
+function versionedPath(path) {
+  const normalized = path.startsWith('/') ? path : `/${path}`;
+  return `${getVersionBase()}${normalized}`;
+}
+window.getVersionBase = getVersionBase;
+window.versionedPath = versionedPath;
+
+// Telemetry helper
+function sendClientTelemetry(event, meta = {}) {
+  try {
+    const url = `${location.origin}${versionedPath('/api/telemetry/client')}`;
+    const payload = { event, meta, path: location.pathname, source: getPreferredSource(), ts: new Date().toISOString() };
+    const body = JSON.stringify(payload);
+    if (navigator && typeof navigator.sendBeacon === 'function') {
+      const blob = new Blob([body], { type: 'application/json' });
+      navigator.sendBeacon(url, blob);
+    } else {
+      fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }).catch(() => {});
+    }
+  } catch (e) { console.warn('[Telemetry] send failed', e); }
+}
+
+const _etagCache = {};
+async function fetchWithEtag(url, options = {}) {
+  const headers = new Headers(options.headers || {});
+  if (_etagCache[url]) {
+    headers.set('If-None-Match', _etagCache[url]);
+  }
+  const resp = await fetch(url, { ...options, headers });
+  if (resp.status === 304) {
+    return { status: 304, data: null, headers: resp.headers };
+  }
+  const data = await resp.json();
+  const etag = resp.headers.get('ETag');
+  if (etag) {
+    _etagCache[url] = etag;
+  }
+  return { status: resp.status, data, headers: resp.headers };
+}
+
+// Initialize game context with source switcher (reload data on change)
+function handleLadderSourceChange(newSource) {
+  loadSessionPhases();
+}
+
+initGameContext({
+  pickerContainerId: 'source-switcher',
+  onSourceChange: handleLadderSourceChange
+});
+
+
+let chart, priceLine;
+let sessionData = [];
+let ladderDisplayRange = null; // null = full session, or number of rounds to show
+let currentIdx = 0;
+let sessionStartTime = null;
+
+// Constants from signal_hunter
+const AVG_SECONDS_PER_ROUND = 40.38;
+const LADDER_DECAY_ROUNDS = 20;
+
+// Initialize chart
+function initChart() {
+  const chartDiv = document.getElementById('chart');
+  
+  const w = chartDiv.offsetWidth || (window.innerWidth - 280);
+  const h = chartDiv.offsetHeight || (window.innerHeight - 40);
+  
+  chart = LightweightCharts.createChart(chartDiv, {
+    layout: {
+      background: { color: '#0b0b0f' },
+      textColor: '#dde1f0',
+    },
+    grid: {
+      vertLines: { color: '#1e1e2e' },
+      horzLines: { color: '#1e1e2e' },
+    },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    timeScale: { borderColor: '#1e1e2e', timeVisible: true, secondsVisible: true },
+    rightPriceScale: { borderColor: '#1e1e2e' },
+    width: w,
+    height: h,
+  });
+  
+  // Price series with markers for phase changes
+  priceLine = chart.addLineSeries({
+    color: '#38bdf8',
+    lineWidth: 2,
+    title: 'Multiplier',
+  });
+  
+  // Ladder strength overlay (ascending = green, collapse = red)
+  window._ascSeries = chart.addLineSeries({
+    color: '#22c55e80',
+    lineWidth: 1,
+    lineStyle: LightweightCharts.LineStyle.Dashed,
+    title: '▲ Asc',
+    priceScaleId: 'str',
+  });
+  window._colSeries = chart.addLineSeries({
+    color: '#ef444480',
+    lineWidth: 1,
+    lineStyle: LightweightCharts.LineStyle.Dashed,
+    title: '▼ Col',
+    priceScaleId: 'str',
+  });
+  chart.priceScale('str').applyOptions({
+    scaleMargins: { top: 0.85, bottom: 0 },
+    visible: false,
+  });
+  
+  console.log('[LadderChart] Chart initialized');
+}
+
+// Calculate actual timeframe-based metrics
+function calculateTimeframeMetrics(roundIdx) {
+  if (!sessionData.length || roundIdx >= sessionData.length) return null;
+  
+  const lookback = Math.min(roundIdx + 1, LADDER_DECAY_ROUNDS + 5);
+  const startIdx = Math.max(0, roundIdx - lookback + 1);
+  const windowData = sessionData.slice(startIdx, roundIdx + 1);
+  
+  if (windowData.length < 3) return null;
+  
+  // Extract multipliers in window
+  const mults = windowData.map(r => r.multiplier);
+  
+  // Calculate phase within window
+  let phase = 'normal';
+  let phaseStrength = 0;
+  
+  // Check for ascending: consecutive increasing
+  let ascCount = 0;
+  const floor = Math.min(...mults.slice(0, 3)); // Early low
+  for (let i = 1; i < mults.length; i++) {
+    if (mults[i] > floor) ascCount++;
+  }
+  
+  // Check for collapse: consecutive decreasing
+  let colCount = 0;
+  const ceiling = Math.max(...mults.slice(0, 3)); // Early high
+  for (let i = 1; i < mults.length; i++) {
+    if (mults[i] < ceiling) colCount++;
+  }
+  
+  // Determine phase with signal weight
+  if (ascCount > mults.length * 0.7) {
+    phase = 'ascending';
+    phaseStrength = ascCount / mults.length;
+  } else if (colCount > mults.length * 0.7) {
+    phase = 'collapse';
+    phaseStrength = colCount / mults.length;
+  } else if (Math.max(...mults) > 10 || Math.min(...mults) < 1.1) {
+    phase = 'resistance';
+    phaseStrength = 0.6;
+  }
+  
+  return {
+    phase,
+    phaseStrength,
+    windowSize: windowData.length,
+    timeframeMinutes: (windowData.length * AVG_SECONDS_PER_ROUND) / 60,
+  };
+}
+
+// Phase 2: Delta tracking + local caching
+let lastRoundId = 0;
+const CACHE_KEY = 'ladder_session_cache';
+const CACHE_TTL = 60000; // 60 seconds
+
+function getPersistentLadderCacheKey() {
+  return `${CACHE_KEY}:${getPreferredSource() || 'aviator'}`;
+}
+
+function readPersistentLadderCache() {
+  try {
+    const raw = localStorage.getItem(getPersistentLadderCacheKey());
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const now = Date.now();
+    if (!parsed || !parsed.ts || now - parsed.ts > CACHE_TTL) return null;
+    return parsed.data || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function writePersistentLadderCache(data) {
+  try {
+    localStorage.setItem(getPersistentLadderCacheKey(), JSON.stringify({ ts: Date.now(), data }));
+  } catch (e) {
+    // Ignore storage failures.
+  }
+}
+
+// Load session phases with delta optimization
+async function loadSessionPhases() {
+  try {
+    const source = getPreferredSource() || 'aviator';
+    const persistedCache = readPersistentLadderCache();
+    if (persistedCache && !sessionData.length) {
+      sessionData = (persistedCache.rounds || []).slice();
+      lastRoundId = (persistedCache && (persistedCache.latest_round_id ?? persistedCache.last_round_id)) || (sessionData.length > 0 ? sessionData[sessionData.length - 1].id : 0);
+    }
+    const useFullLoad = lastRoundId === 0;  // First load or cache expired
+    
+    let url, data;
+    if (useFullLoad) {
+      // Full session load
+      url = `${getVersionBase()}/api/market/session-phases?source=${encodeURIComponent(source)}`;
+      console.log('[LadderChart] Full load:', url);
+      const resp = await fetchWithEtag(url);
+      const payload = resp.status === 304 ? { rounds: sessionData } : resp.data;
+      data = payload;
+      sessionData = (payload.rounds || []).slice();
+      const latestRoundId = (payload && (payload.latest_round_id ?? payload.last_round_id)) ?? (sessionData.length > 0 ? sessionData[sessionData.length - 1].id : 0);
+      lastRoundId = latestRoundId || 0;
+      writePersistentLadderCache(payload);
+      try { const bytes = (new TextEncoder().encode(JSON.stringify(payload))).length; sendClientTelemetry('session_phases_full', { rounds: sessionData.length, bytes }); } catch(e){}
+      console.log(`[LadderChart] Full: ${sessionData.length} rounds, last_id=${lastRoundId}`);
+    } else {
+      // Delta load (only new rounds)
+      const safeLastRoundId = Number.isFinite(lastRoundId) ? lastRoundId : 0;
+      url = `${getVersionBase()}/api/market/session-phases-delta?source=${encodeURIComponent(source)}&last_round_id=${safeLastRoundId}`;
+      const resp = await fetchWithEtag(url);
+      data = resp.status === 304 ? { is_stale: true } : resp.data;
+      
+      if (data.is_stale && (!data.new_rounds || data.new_rounds.length === 0)) {
+        // No new data, use cached session
+        console.log('[LadderChart] Delta: No new data (is_stale=true)');
+        renderChart();
+        return;
+      }
+      
+      // Merge new rounds
+      if (data.new_rounds && data.new_rounds.length > 0) {
+        sessionData.push(...data.new_rounds);
+        lastRoundId = (data && (data.last_round_id ?? data.latest_round_id)) || lastRoundId;
+        writePersistentLadderCache({ rounds: sessionData, latest_round_id: lastRoundId });
+        try { const bytes = (new TextEncoder().encode(JSON.stringify(data))).length; sendClientTelemetry('session_phases_delta', { new_rounds: data.new_rounds.length, total_rounds: sessionData.length, bytes }); } catch(e){}
+        console.log(`[LadderChart] Delta: +${data.new_rounds.length} rounds, total=${sessionData.length}`);
+      }
+    }
+    
+    if (data.error) {
+      console.error('Error:', data.error);
+      return;
+    }
+    
+    if (!sessionData || sessionData.length < 5) {
+      console.error('[LadderChart] Insufficient data');
+      return;
+    }
+    
+    // Update UI
+    const metrics = data.chart_metrics || {};
+    document.getElementById('session-len').textContent = `${sessionData.length} rounds`;
+    document.getElementById('price-range').textContent = 
+      `${metrics.price_min || '—'}x – ${metrics.price_max || '—'}x`;
+    
+    // Update phase counts
+    if (data.phase_summary) {
+      document.getElementById('phase-count-asc').textContent = data.phase_summary.ascending || 0;
+      document.getElementById('phase-count-col').textContent = data.phase_summary.collapse || 0;
+      document.getElementById('phase-count-res').textContent = data.phase_summary.resistance || 0;
+      document.getElementById('phase-count-norm').textContent = 
+        (data.phase_summary.normal || 0) + 
+        (data.phase_summary.release_cooldown || 0) + 
+        (data.phase_summary.release_expansion || 0);
+      
+      const relCool = data.phase_summary.release_cooldown || 0;
+      const relExp  = data.phase_summary.release_expansion || 0;
+      if (relCool > 0 || relExp > 0) {
+        document.getElementById('phase-count-norm').title = 
+          `Normal: ${data.phase_summary.normal||0} · Cooldown: ${relCool} · Expansion: ${relExp}`;
+      }
+    }
+    
+    // Render chart
+    renderChart();
+    
+    // Display latest round
+    if (currentIdx === 0 || !sessionData[currentIdx]) {
+      currentIdx = sessionData.length - 1;
+    }
+    updateCurrentRound();
+  } catch (err) {
+    console.error('[LadderChart] Error loading phases:', err);
+  }
+}
+
+// Build a clean monotonic timestamp array from session data.
+// Strategy: use real timestamps where available and in-order,
+// otherwise estimate from the last known good timestamp + avg round duration.
+function buildCleanTimestamps(rounds) {
+  const AVG = AVG_SECONDS_PER_ROUND;
+  const parsed = rounds.map(r => {
+    if (r.timestamp) {
+      const t = new Date(r.timestamp).getTime();
+      if (!isNaN(t) && t > 0) return Math.floor(t / 1000);
+    }
+    return null;
+  });
+
+  // Find the median timestamp among non-null values to detect outliers
+  const valid = parsed.filter(t => t !== null).sort((a, b) => a - b);
+  const median = valid.length ? valid[Math.floor(valid.length / 2)] : Math.floor(Date.now() / 1000);
+  const stdRange = 6 * 3600; // anything >6h from median is suspicious
+
+  // Build clean array: start from first reasonable timestamp, increment by avg
+  let base = null;
+  for (let i = 0; i < parsed.length; i++) {
+    if (parsed[i] !== null && Math.abs(parsed[i] - median) < stdRange) {
+      // Back-estimate base from first reasonable ts
+      base = parsed[i] - i * AVG;
+      break;
+    }
+  }
+  if (base === null) base = Math.floor(Date.now() / 1000) - rounds.length * AVG;
+
+  const result = [];
+  const seenTs = new Set();
+  for (let i = 0; i < rounds.length; i++) {
+    const real = parsed[i];
+    let ts;
+    if (real !== null && Math.abs(real - median) < stdRange) {
+      // Real timestamp is sane — use it, but ensure monotonic
+      ts = Math.max(real, (result.length ? result[result.length - 1] + 1 : real));
+    } else {
+      // Estimated
+      ts = Math.floor(base + i * AVG);
+      if (result.length) ts = Math.max(ts, result[result.length - 1] + 1);
+    }
+    while (seenTs.has(ts)) ts++;
+    seenTs.add(ts);
+    result.push(ts);
+  }
+  return result;
+}
+
+let _ladderChartFirstLoad = true;
+
+// Render chart with clean timestamps and phase coloring
+function renderChart() {
+  if (!sessionData.length || !chart) return;
+
+  // Choose rounds to render based on display range (slice retains original order)
+  const rounds = ladderDisplayRange ? sessionData.slice(-ladderDisplayRange) : sessionData;
+  const timestamps = buildCleanTimestamps(rounds);
+
+  const priceData = [];
+  const ascData = [];
+  const colData = [];
+  const markers = [];
+  let lastPhase = null;
+
+  rounds.forEach((r, i) => {
+    const ts = timestamps[i];
+    priceData.push({ time: ts, value: r.multiplier });
+    const ascScore = r.signals?.ascending_ladder?.strength_score ?? 0;
+    const colScore = r.signals?.collapse_ladder?.strength_score ?? 0;
+    ascData.push({ time: ts, value: ascScore });
+    colData.push({ time: ts, value: colScore });
+
+    const phase = r.phase || 'normal';
+    if (phase !== lastPhase && phase !== 'normal') {
+      const shapes = { ascending:'arrowUp', collapse:'arrowDown', resistance:'circle', release_cooldown:'circle', release_expansion:'arrowUp' };
+      const colors = { ascending:'#22c55e', collapse:'#ef4444', resistance:'#f59e0b', release_cooldown:'#f87171', release_expansion:'#34d399' };
+      const labels = { ascending:'▲', collapse:'▼', resistance:'◆', release_cooldown:'⬇', release_expansion:'↑' };
+      markers.push({
+        time: ts,
+        position: (phase === 'collapse' || phase === 'release_cooldown') ? 'aboveBar' : 'belowBar',
+        color: colors[phase] || '#818cf8',
+        shape: shapes[phase] || 'circle',
+        text: labels[phase] || '·',
+        size: 1,
+      });
+      lastPhase = phase;
+    }
+  });
+
+  // Save viewport before setData wipes it
+  const ts2 = chart.timeScale();
+  const lr = _ladderChartFirstLoad ? null : ts2.getVisibleLogicalRange();
+
+  priceLine.setData(priceData);
+  priceLine.setMarkers(markers);
+  if (window._ascSeries) window._ascSeries.setData(ascData);
+  if (window._colSeries) window._colSeries.setData(colData);
+
+  if (_ladderChartFirstLoad) {
+    ts2.fitContent();
+    _ladderChartFirstLoad = false;
+  } else if (lr) {
+    const barWidth = Math.max(1, lr.to - lr.from);
+    const wasAtEdge = lr.to >= rounds.length - 2;
+    ts2.setVisibleLogicalRange(wasAtEdge
+      ? { from: rounds.length - barWidth, to: rounds.length }
+      : lr);
+  }
+
+  // Update mega moonshot scores display whenever the chart renders
+  try { renderMegaScores(); } catch (e) { /* ignore UI errors */ }
+}
+
+// Update round metrics using timeframe analysis
+function updateCurrentRound() {
+  if (!sessionData.length || currentIdx >= sessionData.length) return;
+  
+  const round = sessionData[currentIdx];
+  const signals = round.signals;
+  
+  // Update phase display with timeframe info
+  const phaseBox = document.getElementById('phase-display');
+  phaseBox.className = `phase-bar ${round.phase}`;
+  const ts = round.timestamp ? new Date(round.timestamp).toLocaleTimeString() : `R${currentIdx+1}`;
+  phaseBox.textContent = `${round.phase.toUpperCase()} · ${round.state} · ${round.multiplier}x · ${ts}`;
+  
+  // Show round position and actual time
+  const roundTs = round.timestamp ? new Date(round.timestamp).toLocaleTimeString() : '';
+  document.getElementById('session-len').textContent = 
+    `R${currentIdx + 1}/${sessionData.length}${roundTs ? ' · ' + roundTs : ''}`;
+  
+  // Ascending ladder with timeframe accuracy
+  const ascBox = document.getElementById('asc-ladder-box');
+  if (signals.ascending_ladder?.active) {
+    const asc = signals.ascending_ladder;
+    const timeEstimate = (asc.length * AVG_SECONDS_PER_ROUND / 60).toFixed(1);
+    ascBox.className = 'ladder-box active-asc';
+    ascBox.innerHTML = `
+      <div class="ladder-label">✓ ACTIVE (${asc.strength_score.toFixed(2)} str)</div>
+      <div class="ladder-stat"><span>Length:</span><span class="val">${asc.length}r (${timeEstimate}m)</span></div>
+      <div class="ladder-stat"><span>Floor:</span><span class="val">${asc.floor.toFixed(3)}x</span></div>
+      <div class="ladder-stat"><span>Pressure:</span><span class="val">${(asc.pressure * 100).toFixed(0)}%</span></div>
+      <div class="ladder-stat"><span>Freshness:</span><span class="val">${(asc.freshness * 100).toFixed(0)}%</span></div>
+    `;
+  } else {
+    ascBox.className = 'ladder-box';
+    ascBox.innerHTML = '<div class="ladder-label">Inactive</div>';
+  }
+  
+  // Collapse ladder with breakout probability
+  const colBox = document.getElementById('col-ladder-box');
+  if (signals.collapse_ladder?.active) {
+    const col = signals.collapse_ladder;
+    const fizzleTag = col.is_fizzle ? ' ⚠️ FIZZLE' : (col.strength_score > 0.9 ? ' 🚀 PEAK' : '');
+    const timeEstimate = (col.run * AVG_SECONDS_PER_ROUND / 60).toFixed(1);
+    colBox.className = 'ladder-box active-col';
+    colBox.innerHTML = `
+      <div class="ladder-label">✓ ACTIVE (${col.strength_score.toFixed(2)} str)${fizzleTag}</div>
+      <div class="ladder-stat"><span>Ceiling:</span><span class="val">${col.ceiling.toFixed(2)}x</span></div>
+      <div class="ladder-stat"><span>Run:</span><span class="val">${col.run}r (${timeEstimate}m)</span></div>
+      <div class="ladder-stat"><span>Breakout %:</span><span class="val">${col.breakout_pct.toFixed(0)}%</span></div>
+    `;
+  } else {
+    colBox.className = 'ladder-box';
+    colBox.innerHTML = '<div class="ladder-label">Inactive</div>';
+  }
+  
+  // Resistance with combined scoring + cleared levels
+  const resBox = document.getElementById('resistance-box');
+  const res = signals.resistance;
+  const upperStr = res.upper_strength || 0;
+  const recentlyCleared = res.recently_cleared || 0;
+  const lowerDens = (res.lower_density * 100).toFixed(0);
+  const combScore = res.combined_score.toFixed(3);
+  const pr = signals.pressure_release || {};
+  
+  let resHtml = '';
+  if (upperStr > 0 || res.lower_density > 0.3 || recentlyCleared > 0) {
+    resHtml += `
+      <div class="metric"><span class="label">Upper uncleared:</span><span class="value gold">${upperStr}lvl${upperStr >= 3 ? ' 🔥' : ''}</span></div>
+      <div class="metric"><span class="label">Recently cleared:</span><span class="value ${recentlyCleared >= 2 ? 'up' : ''}">${recentlyCleared}lvl${recentlyCleared >= 2 ? ' 🔓' : ''}</span></div>
+      <div class="metric"><span class="label">Lower compression:</span><span class="value gold">${lowerDens}%</span></div>
+      <div class="metric"><span class="label">Combined score:</span><span class="value gold">${combScore}</span></div>`;
+  }
+  
+  // Pressure release state
+  if (pr.release_type && pr.release_type !== 'none') {
+    const prColor = pr.cooldown_active ? '#ef4444' : pr.expansion_active ? '#22c55e' : '#8891b0';
+    const prLabel = pr.cooldown_active ? `⬇️ Cooldown ${pr.rounds_since}r` :
+                    pr.expansion_active ? `📈 Expanding ×${pr.range_expansion?.toFixed(1)}` :
+                    `✅ ${pr.release_type} ${pr.rounds_since}r ago`;
+    resHtml += `<div style="margin-top:4px;padding:4px;background:#111118;border-left:2px solid ${prColor};border-radius:2px;font-size:9px;color:${prColor}">${prLabel}</div>`;
+    if (pr.ceiling_cleared) {
+      resHtml += `<div style="font-size:8px;color:var(--muted);margin-top:2px">Ceiling cleared: ${pr.ceiling_cleared}x</div>`;
+    }
+  }
+  
+  resBox.innerHTML = resHtml || '<div style="color:var(--dim)">—</div>';
+}
+// Toggle which range of rounds to display (null = full session)
+function setLadderDisplayRange(n) {
+  ladderDisplayRange = n || null;
+  document.querySelectorAll('.range-btn').forEach(btn => {
+    const r = btn.dataset.range === 'full' ? null : Number(btn.dataset.range);
+    btn.classList.toggle('active', (r === ladderDisplayRange));
+  });
+  // Re-render chart using selected slice
+  renderChart();
+}
+
+// Compute heuristic scores for mega moonshot ranges using recent session signals
+function computeMegaMoonshotRangeScores(rounds) {
+  if (!Array.isArray(rounds) || !rounds.length) return {};
+  const thresholds = [10, 50, 200];
+  const N = Math.min(120, rounds.length);
+  const window = rounds.slice(-N);
+
+  const safeNum = v => (v == null || Number.isNaN(Number(v))) ? 0 : Number(v);
+
+  const mults = window.map(r => safeNum(r.multiplier));
+  const mean = mults.reduce((a,b)=>a+b,0) / Math.max(1, mults.length);
+  const variance = mults.reduce((a,b)=>a+Math.pow(b-mean,2),0) / Math.max(1, mults.length);
+  const std = Math.sqrt(variance || 0);
+  const volPenalty = Math.min(1, std / Math.max(0.01, Math.abs(mean)));
+
+  const avg = (arr, fn) => { let s=0,c=0; for(let i=0;i<arr.length;i++){ const v=fn(arr[i]); if(v!=null && !Number.isNaN(v)){s+=v;c++;}} return c? s/c:0 };
+  const ascAvg = avg(window, r => r.signals?.ascending_ladder?.strength_score || 0);
+  const colAvg = avg(window, r => r.signals?.collapse_ladder?.strength_score || 0);
+  const pressureAvg = avg(window, r => r.signals?.resistance?.combined_score || 0);
+
+  // momentum trend: difference between last and prior window
+  const span = Math.min(20, Math.floor(window.length/4) || 5);
+  const tail = window.slice(-span);
+  const prev = window.slice(Math.max(0, window.length - span*2), Math.max(0, window.length - span));
+  const tailMomentum = avg(tail, r => r.signals?.ascending_ladder?.strength_score || 0) - avg(prev, r => r.signals?.ascending_ladder?.strength_score || 0);
+
+  const seriesScores = {};
+  thresholds.forEach(th => {
+    const momentum = Math.max(0, ascAvg + tailMomentum - colAvg * 0.4);
+    // Compose: momentum (visibility of trend), clarity (pressure), collapse penalty, volatility penalty
+    const raw = (momentum * 0.40) + (pressureAvg * 0.25) + ((1 - colAvg) * 0.18) - (volPenalty * 0.15);
+    const normalized = Math.max(0, Math.min(1, raw));
+
+    // simple ETA to reach target based on momentum change rate
+    const target = th === 10 ? 0.38 : th === 50 ? 0.62 : 0.85;
+    const need = Math.max(0, target - normalized);
+    const trendPerRound = tailMomentum / Math.max(1, span);
+    const estRounds = trendPerRound > 0.0001 ? Math.ceil(need / trendPerRound) : null;
+
+    seriesScores[th] = {
+      threshold: th,
+      score: normalized,
+      pct: Math.round(normalized * 100),
+      target,
+      needPct: Math.round(need * 100),
+      volPenalty: Number(volPenalty.toFixed(3)),
+      estRoundsToTarget: estRounds,
+    };
+  });
+  return seriesScores;
+}
+
+function renderMegaScores() {
+  const el = document.getElementById('mega-scores-body');
+  if (!el) return;
+  const rounds = sessionData.slice();
+  const scores = computeMegaMoonshotRangeScores(rounds);
+  if (!scores || Object.keys(scores).length === 0) { el.textContent = 'Insufficient data'; return; }
+  const rows = [10,50,200].map(th => {
+    const s = scores[th];
+    const est = s.estRoundsToTarget == null ? 'unknown' : `${s.estRoundsToTarget}r`;
+    return `<div style="display:flex;justify-content:space-between;padding:6px 4px;border-bottom:1px solid rgba(0,0,0,.05)"><div><strong>${s.threshold}x</strong><div style="font-size:11px;color:var(--dim)">Score ${s.pct}% · need +${s.needPct}%</div></div><div style="text-align:right"><div style="font-weight:700">${s.pct}%</div><div class="small">ETA ~ ${est}</div></div></div>`;
+  }).join('');
+  el.innerHTML = rows;
+}
+
+// Keyboard controls with fixed navigation
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight' && currentIdx < sessionData.length - 1) {
+    currentIdx++;
+    updateCurrentRound();
+    console.log(`[Nav] → Round ${currentIdx + 1}/${sessionData.length}`);
+  } else if (e.key === 'ArrowLeft' && currentIdx > 0) {
+    currentIdx--;
+    updateCurrentRound();
+    console.log(`[Nav] ← Round ${currentIdx + 1}/${sessionData.length}`);
+  } else if (e.key === 'End') {
+    currentIdx = sessionData.length - 1;
+    updateCurrentRound();
+  } else if (e.key === 'Home') {
+    currentIdx = 0;
+    updateCurrentRound();
+  }
+});
+
+// Initialize on load
+window.addEventListener('load', () => {
+  // Wait a tick for layout to settle, then init chart
+  requestAnimationFrame(() => {
+    initChart();
+    loadSessionPhases();
+  });
+  
+  // Refresh every 15 seconds for real-time updates — store handle so we
+  // can clear it when the tab goes hidden.
+  window._ladderRefreshInterval = setInterval(loadSessionPhases, 15000);
+});
+
+// Handle resize
+window.addEventListener('resize', () => {
+  if (chart) {
+    const container = document.getElementById('chart');
+    chart.applyOptions({ width: container.offsetWidth, height: container.offsetHeight });
+  }
+});
+
+// Pause polling when the tab is hidden; resume (and reload) when visible again.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    if (window._ladderRefreshInterval) {
+      clearInterval(window._ladderRefreshInterval);
+      window._ladderRefreshInterval = null;
+    }
+  } else {
+    // Reload immediately so the user sees fresh data, then restart polling.
+    loadSessionPhases();
+    window._ladderRefreshInterval = setInterval(loadSessionPhases, 15000);
+  }
+});
+
+// Clean up on unload/navigate-away.
+window.addEventListener('pagehide', () => {
+  if (window._ladderRefreshInterval) {
+    clearInterval(window._ladderRefreshInterval);
+    window._ladderRefreshInterval = null;
+  }
+});
+</script>
+
+<script>
+// Version badge initializer for ladder page
+(function(){
+  function getVersionBaseLocal(){const segments = window.location.pathname.split('/').filter(Boolean);const first = segments[0]||'';return /^v\d+\.\d+\.\d+$/.test(first)?`/${first}`:''}
+  function init(){
+    const base = (window.getVersionBase && typeof getVersionBase === 'function') ? getVersionBase() : getVersionBaseLocal();
+    const v = base ? base.replace('/','') : (window.AVFS_VERSION_ID || 'local');
+    const el = document.getElementById('version-badge'); if(el) el.textContent = v;
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
+</script>
+
+<script>
+function toggleVersionMenu() {
+  const menu = document.getElementById('version-menu');
+  if (!menu) return;
+  menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+}
+function getVersionBase() {
+  const segments = window.location.pathname.split('/').filter(Boolean);
+  const first = segments[0] || '';
+  return /^v\d+\.\d+(?:\.\d+)?$/.test(first) ? `/${first}` : '';
+}
+function versionedPath(path) {
+  const normalized = path.startsWith('/') ? path : `/${path}`;
+  return `${getVersionBase()}${normalized}`;
+}
+function renderVersionMenu() {
+  const container = document.getElementById('version-menu-list');
+  if (!container) return;
+  container.innerHTML = '<button class="btn" disabled>Loading versions…</button>';
+  fetch(versionedPath('/api/versions'))
+    .then(r => { if (!r.ok) throw new Error('Failed to load versions'); return r.json(); })
+    .then(data => {
+      const versions = data.available_versions || [];
+      const current = data.current_version || '';
+      if (!versions.length) {
+        container.innerHTML = '<button class="btn" disabled>No versions found</button>';
+        return;
+      }
+      container.innerHTML = versions.map(version => {
+        const label = version === current ? `${version} ✓` : version;
+        return `<button class="btn" onclick="navigateToVersion('${version}')">${label}</button>`;
+      }).join('');
+    })
+    .catch(err => {
+      console.warn('[AVFS] version menu load failed', err);
+      container.innerHTML = '<button class="btn" disabled>Unable to load versions</button>';
+    });
+}
+function navigateToVersion(version) {
+  const suffix = window.location.pathname.replace(/^\/v\d+\.\d+(?:\.\d+)?/, '') || '/dashboard';
+  window.location.href = `/${version}${suffix}`;
+}
+document.addEventListener('click', event => {
+  if (!event.target.closest('.version-switcher')) {
+    const menu = document.getElementById('version-menu');
+    if (menu) menu.style.display = 'none';
+  }
+});
+window.addEventListener('load', renderVersionMenu);
+</script>
+</body>
+</html>

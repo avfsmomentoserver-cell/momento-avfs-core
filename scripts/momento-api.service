@@ -1,0 +1,28 @@
+[Unit]
+Description=Momento Core / AVFS API
+Documentation=https://github.com/your-org/momento-core
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=momento
+Group=momento
+WorkingDirectory=/opt/momento/backend
+EnvironmentFile=-/opt/momento/backend/.env.production
+ExecStart=/opt/momento/backend/.venv/bin/python run_api.py
+Restart=always
+RestartSec=5
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/var/lib/momento /var/log/momento
+
+StandardOutput=append:/var/log/momento/api.log
+StandardError=append:/var/log/momento/api.err
+
+[Install]
+WantedBy=multi-user.target
