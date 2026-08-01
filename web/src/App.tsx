@@ -34,6 +34,7 @@ import RoundTesting from "./pages/dashboard/RoundTesting";
 import Settings from "./pages/dashboard/Settings";
 import Sources from "./pages/dashboard/Sources";
 import Users from "./pages/dashboard/Users";
+import TradingView from "./pages/dashboard/TradingView";
 import Inventory from "./pages/Inventory";
 import Landing from "./pages/Landing";
 import NotFound from "./pages/NotFound";
@@ -79,6 +80,7 @@ const App = () => (
               <Route path="/dashboard/mega-pressure" element={<MegaPressureTracker />} />
               <Route path="/dashboard/momento-fx" element={<MomentoFX />} />
               <Route path="/dashboard/momento-fx-v2" element={<MomentoFXDashboard />} />
+              <Route path="/dashboard/tradingview" element={<TradingView />} />
               <Route path="/dashboard/pattern-dna" element={<PatternDnaTracker />} />
               <Route path="/dashboard/studio" element={<ForecastStudio />} />
               <Route path="/dashboard/ingest" element={<Ingest />} />

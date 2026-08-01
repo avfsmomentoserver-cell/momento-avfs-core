@@ -25,6 +25,7 @@ import {
   Users,
   X,
   Zap,
+  BarChart3,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { NavLink } from "react-router-dom";
@@ -74,6 +75,7 @@ const GROUPS: NavGroup[] = [
       { to: "/orchestrator", label: "Orchestrator", icon: Compass },
       { to: "/dashboard/momento-fx", label: "MomentoFX", icon: LineChart },
       { to: "/dashboard/momento-fx-v2", label: "MomentoFX v2.0", icon: Sparkles },
+      { to: "/dashboard/tradingview", label: "TradingView", icon: BarChart3 },
       { to: "/dashboard/autopilot", label: "Autopilot", icon: Gauge },
       { to: "/inventory", label: "Plugin Inventory", icon: Blocks },
     ],
