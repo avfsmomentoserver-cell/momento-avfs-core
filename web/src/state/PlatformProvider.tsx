@@ -148,6 +148,8 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       setFlashRoundId(round.id);
       if (flashTimer.current !== null) window.clearTimeout(flashTimer.current);
       flashTimer.current = window.setTimeout(() => setFlashRoundId(null), 1400);
+      // Trigger analysis refresh when new round arrives
+      void queryClient.invalidateQueries({ queryKey: ["analysis", source] });
     });
 
     const offRoundsUpdate = wsTransport.on("rounds:update", (envelope) => {
@@ -156,6 +158,8 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       if (payload.rounds?.length) {
         setRounds((previous) => mergeRounds(previous, payload.rounds ?? []));
         setLastUpdated(new Date());
+        // Trigger analysis refresh when rounds are updated
+        void queryClient.invalidateQueries({ queryKey: ["analysis", source] });
       }
     });
 

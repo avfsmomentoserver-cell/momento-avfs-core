@@ -30,7 +30,7 @@ import { usePlatform } from "@/state/PlatformProvider";
 
 /** The primary operator surface: everything that matters in one screen. */
 export default function CommandCenter() {
-  const { source, flashRoundId, loading } = usePlatform();
+  const { source, flashRoundId, loading, analysis } = usePlatform();
   const { isOperator } = useAuth();
   const queryClient = useQueryClient();
 
@@ -47,20 +47,6 @@ export default function CommandCenter() {
     staleTime: 1500,
   });
 
-  const fileAnalysisQuery = useQuery({
-    queryKey: ["command-center-analysis", source],
-    queryFn: () => api.analysis(source, 600, "file"),
-    refetchInterval: false, // Only update on new round WebSocket events
-    staleTime: 30000,
-  });
-
-  // Refetch analysis when new rounds arrive via WebSocket
-  useEffect(() => {
-    if (flashRoundId) {
-      void queryClient.invalidateQueries({ queryKey: ["command-center-analysis", source] });
-    }
-  }, [flashRoundId, source, queryClient]);
-
   const recordForecast = useMutation({
     mutationFn: () => api.recordForecast(source),
     onSuccess: (result) => {
@@ -74,14 +60,14 @@ export default function CommandCenter() {
     onError: (error: Error) => toast.error("Could not record forecast", { description: error.message }),
   });
 
-  const confidence = fileAnalysisQuery.data?.prediction_confidence.confidence ?? 0;
-  const streaks = fileAnalysisQuery.data?.streaks;
-  const resistance = fileAnalysisQuery.data?.signals.upper_resistance;
+  const confidence = analysis?.prediction_confidence.confidence ?? 0;
+  const streaks = analysis?.streaks;
+  const resistance = analysis?.signals.upper_resistance;
 
   return (
     <AppShell
       title="Command Center"
-      subtitle={fileAnalysisQuery.data?.narrative ?? "Live signal, forecast and session telemetry"}
+      subtitle={analysis?.narrative ?? "Live signal, forecast and session telemetry"}
       actions={
         isOperator ? (
           <Button
@@ -89,7 +75,7 @@ export default function CommandCenter() {
             variant="outline"
             className="hidden gap-1.5 sm:inline-flex"
             onClick={() => recordForecast.mutate()}
-            disabled={recordForecast.isPending || !fileAnalysisQuery.data?.forecast}
+            disabled={recordForecast.isPending || !analysis?.forecast}
           >
             {recordForecast.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
             Record forecast
@@ -97,7 +83,7 @@ export default function CommandCenter() {
         ) : undefined
       }
     >
-      {loading && !fileAnalysisQuery.data ? (
+      {loading && !analysis ? (
         <div className="flex h-64 items-center justify-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
           Loading engine state…
@@ -108,8 +94,8 @@ export default function CommandCenter() {
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <StatTile
               label="Market state"
-              value={<StateBadge state={fileAnalysisQuery.data?.state} size="lg" pulse={fileAnalysisQuery.data?.state === "Ignition" || fileAnalysisQuery.data?.state === "Moonshot"} />}
-              hint={fileAnalysisQuery.data?.state_meta.meaning}
+              value={<StateBadge state={analysis?.state} size="lg" pulse={analysis?.state === "Ignition" || analysis?.state === "Moonshot"} />}
+              hint={analysis?.state_meta.meaning}
               accent="neutral"
               emphasis
             />
@@ -118,38 +104,38 @@ export default function CommandCenter() {
               value={percent(confidence)}
               accent={confidence >= 0.66 ? "signal" : confidence >= 0.38 ? "caution" : "critical"}
               progress={confidence}
-              hint={fileAnalysisQuery.data?.forecast?.confidence_label ? `${fileAnalysisQuery.data.forecast.confidence_label} conviction` : "blended read"}
+              hint={analysis?.forecast?.confidence_label ? `${analysis.forecast.confidence_label} conviction` : "blended read"}
               icon={<Gauge className="h-3.5 w-3.5" />}
             />
             <StatTile
               label="Moonshot probability"
-              value={percent(fileAnalysisQuery.data?.prediction_confidence.moonshot_probability)}
+              value={percent(analysis?.prediction_confidence.moonshot_probability)}
               accent="info"
-              progress={fileAnalysisQuery.data?.prediction_confidence.moonshot_probability ?? 0}
+              progress={analysis?.prediction_confidence.moonshot_probability ?? 0}
               hint={
-                fileAnalysisQuery.data?.band_exhaustion?.most_overdue
-                  ? `${fileAnalysisQuery.data.band_exhaustion.most_overdue.label} ${decimal(fileAnalysisQuery.data.band_exhaustion.most_overdue.overdue_ratio, 2)}x cadence`
+                analysis?.band_exhaustion?.most_overdue
+                  ? `${analysis.band_exhaustion.most_overdue.label} ${decimal(analysis.band_exhaustion.most_overdue.overdue_ratio, 2)}x cadence`
                   : "cadence warming up"
               }
               icon={<Rocket className="h-3.5 w-3.5" />}
             />
             <StatTile
               label="Ignition probability"
-              value={percent(fileAnalysisQuery.data?.prediction_confidence.ignition_probability)}
+              value={percent(analysis?.prediction_confidence.ignition_probability)}
               accent="signal"
-              progress={fileAnalysisQuery.data?.prediction_confidence.ignition_probability ?? 0}
+              progress={analysis?.prediction_confidence.ignition_probability ?? 0}
               hint={
-                fileAnalysisQuery.data?.signals.nested
-                  ? `compression ${percent(fileAnalysisQuery.data.signals.nested.compression)}`
+                analysis?.signals.nested
+                  ? `compression ${percent(analysis.signals.nested.compression)}`
                   : "no compression measured"
               }
               icon={<Flame className="h-3.5 w-3.5" />}
             />
             <StatTile
               label="Last multiplier"
-              value={multiplier(fileAnalysisQuery.data?.latest.multiplier)}
-              accent={(fileAnalysisQuery.data?.latest.multiplier ?? 0) >= 2 ? "signal" : "critical"}
-              hint={`${fileAnalysisQuery.data?.latest.band ?? "—"} band · ${fileAnalysisQuery.data?.latest.energy ?? "—"} energy`}
+              value={multiplier(analysis?.latest.multiplier)}
+              accent={(analysis?.latest.multiplier ?? 0) >= 2 ? "signal" : "critical"}
+              hint={`${analysis?.latest.band ?? "—"} band · ${analysis?.latest.energy ?? "—"} energy`}
               icon={<Activity className="h-3.5 w-3.5" />}
             />
           </div>
@@ -183,17 +169,17 @@ export default function CommandCenter() {
           {/* ---- three column body ---- */}
           <div className="grid gap-4 xl:grid-cols-12">
             <div className="space-y-4 xl:col-span-3">
-              <SignalPanel signals={fileAnalysisQuery.data?.signals} />
-              <WarningsPanel warnings={fileAnalysisQuery.data?.warnings ?? []} />
-              <PressurePanel pressure={fileAnalysisQuery.data?.advanced_features?.pressure} />
-              <BaselinePanel baseline={fileAnalysisQuery.data?.advanced_features?.baseline} />
-              <MoonshotPanel moonshot={fileAnalysisQuery.data?.advanced_features?.moonshot} />
-              <BandAnalysisPanel bands={fileAnalysisQuery.data?.advanced_features?.bands} bandRelativity={fileAnalysisQuery.data?.advanced_features?.band_relativity} />
+              <SignalPanel signals={analysis?.signals} />
+              <WarningsPanel warnings={analysis?.warnings ?? []} />
+              <PressurePanel pressure={analysis?.advanced_features?.pressure} />
+              <BaselinePanel baseline={analysis?.advanced_features?.baseline} />
+              <MoonshotPanel moonshot={analysis?.advanced_features?.moonshot} />
+              <BandAnalysisPanel bands={analysis?.advanced_features?.bands} bandRelativity={analysis?.advanced_features?.band_relativity} />
             </div>
 
             <div className="space-y-4 xl:col-span-6">
               <ForecastPanel
-                forecast={fileAnalysisQuery.data?.forecast}
+                forecast={analysis?.forecast}
                 actions={
                   isOperator ? (
                     <Button
@@ -201,7 +187,7 @@ export default function CommandCenter() {
                       variant="ghost"
                       className="h-7 gap-1.5 px-2 text-[11px]"
                       onClick={() => recordForecast.mutate()}
-                      disabled={recordForecast.isPending || !fileAnalysisQuery.data?.forecast}
+                      disabled={recordForecast.isPending || !analysis?.forecast}
                     >
                       <Save className="h-3 w-3" />
                       Record
@@ -211,8 +197,8 @@ export default function CommandCenter() {
               />
 
               <div className="grid gap-4 md:grid-cols-2">
-                <PredictionsPanel predictions={fileAnalysisQuery.data?.predictions ?? []} />
-                <AccuracyPanel accuracy={fileAnalysisQuery.data?.accuracy} pending={fileAnalysisQuery.data?.pending_forecasts} />
+                <PredictionsPanel predictions={analysis?.predictions ?? []} />
+                <AccuracyPanel accuracy={analysis?.accuracy} pending={analysis?.pending_forecasts} />
               </div>
 
               {/* streak strip */}
@@ -250,8 +236,8 @@ export default function CommandCenter() {
 
             <div className="space-y-4 xl:col-span-3">
               <RoundsFeed rounds={allRoundsQuery.data?.rounds ?? []} flashRoundId={flashRoundId} limit={80} height="max-h-[440px]" />
-              <SessionPanel session={fileAnalysisQuery.data?.session} regime={fileAnalysisQuery.data?.regime} houseEdge={fileAnalysisQuery.data?.house_edge} />
-              <TransitionsPanel transitions={fileAnalysisQuery.data?.transitions ?? []} limit={10} />
+              <SessionPanel session={analysis?.session} regime={analysis?.regime} houseEdge={analysis?.house_edge} />
+              <TransitionsPanel transitions={analysis?.transitions ?? []} limit={10} />
             </div>
           </div>
         </div>
