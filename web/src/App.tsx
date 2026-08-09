@@ -39,6 +39,7 @@ import Inventory from "./pages/Inventory";
 import Landing from "./pages/Landing";
 import NotFound from "./pages/NotFound";
 import Orchestrator from "./pages/Orchestrator";
+import { FXStateSimpleTest } from "./test-fx-simple";
 
 // React Query is the top-level provider; every other provider nests inside it.
 const queryClient = new QueryClient({
@@ -92,6 +93,7 @@ const App = () => (
               <Route path="/dashboard/settings" element={<Settings />} />
               <Route path="/dashboard/users" element={<Users />} />
               <Route path="/dashboard/testing" element={<RoundTesting />} />
+              <Route path="/dashboard/fx-test" element={<FXStateSimpleTest />} />
 
               {/* cross-cutting surfaces */}
               <Route path="/orchestrator" element={<Orchestrator />} />

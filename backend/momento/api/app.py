@@ -23,6 +23,7 @@ from .routes import core as core_routes
 from .routes import engines as engines_routes
 from .routes import features as features_routes
 from .routes import forecasts as forecast_routes
+from .routes import fx_state as fx_state_routes
 from .routes import ingest as ingest_routes
 from .routes import market as market_routes
 from .routes import mega_pressure as mega_pressure_routes
@@ -105,8 +106,9 @@ def create_app() -> FastAPI:
 
     application.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"] if config.ALLOW_ALL_CORS else config.CORS_ORIGINS,
-        allow_credentials=not config.ALLOW_ALL_CORS,
+        allow_origins=config.CORS_ORIGINS if not config.ALLOW_ALL_CORS else ["*"],
+        allow_origin_regex=".*" if config.ALLOW_ALL_CORS else None,
+        allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -139,6 +141,7 @@ def create_app() -> FastAPI:
         backtest_enhanced_routes,
         vocabulary_routes,
         mega_pressure_routes,
+        fx_state_routes,
     ):
         application.include_router(module.router, prefix=API_PREFIX)
 

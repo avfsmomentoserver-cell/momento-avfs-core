@@ -70,9 +70,9 @@ BOOTSTRAP_OPERATOR_PASSWORD = os.environ.get("MOMENTO_OPERATOR_PASSWORD", "momen
 
 WATCHER_ENABLED = _env_bool("MOMENTO_WATCHER_ENABLED", True)
 WATCHER_INTERVAL = _env_float("MOMENTO_WATCHER_INTERVAL", 2.0)
-WATCH_DOWNLOADS = _env_bool("MOMENTO_WATCH_DOWNLOADS", False)
+WATCH_DOWNLOADS = _env_bool("MOMENTO_WATCH_DOWNLOADS", True)
 
-FEED_ENABLED_ON_BOOT = _env_bool("MOMENTO_FEED_AUTOSTART", True)
+FEED_ENABLED_ON_BOOT = _env_bool("MOMENTO_FEED_AUTOSTART", False)
 
 CORS_ORIGINS = [
     o.strip()
@@ -80,7 +80,8 @@ CORS_ORIGINS = [
         "MOMENTO_CORS_ORIGINS",
         "http://localhost:5173,http://localhost:4173,http://localhost:3000,http://127.0.0.1:5173,"
         "http://localhost:8080,http://127.0.0.1:8080,http://10.0.0.4:8080,http://10.8.0.1:8080,"
-        "http://10.0.0.4:5173,http://10.8.0.1:5173",
+        "http://10.0.0.4:5173,http://10.8.0.1:5173,http://localhost:8081,http://127.0.0.1:8081,"
+        "http://10.0.0.4:8081,http://10.8.0.1:8081",
     ).split(",")
     if o.strip()
 ]

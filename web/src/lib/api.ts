@@ -433,6 +433,24 @@ export const api = {
       "/platform/docs",
     ),
   downloadUrl: (filename: string) => `${API_BASE_URL}${API_PREFIX}/platform/download/${filename}`,
+
+  /* ---- FX State Machine ------------------------------------------------- */
+  fxStatePhysics: (source: string, limit = 100) =>
+    request(`/fx-state/physics${qs({ source, limit })}`),
+  fxState: (source: string, limit = 100) =>
+    request(`/fx-state/state${qs({ source, limit })}`),
+  fxStateSequence: (source: string, limit = 200) =>
+    request(`/fx-state/states/sequence${qs({ source, limit })}`),
+  fxIndices: (source: string, limit = 100) =>
+    request(`/fx-state/indices${qs({ source, limit })}`),
+  fxTransitions: (source: string, limit = 200) =>
+    request(`/fx-state/transitions${qs({ source, limit })}`),
+  fxDna: (source: string, limit = 200) =>
+    request(`/fx-state/dna${qs({ source, limit })}`),
+  fxCandles: (source: string, roundsPerCandle = 5, limit = 200) =>
+    request(`/fx-state/candles${qs({ source, rounds_per_candle: roundsPerCandle, limit })}`),
+  fxStateDefinitions: () =>
+    request('/fx-state/definitions/states'),
 };
 
 export type Api = typeof api;

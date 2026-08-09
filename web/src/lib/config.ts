@@ -20,7 +20,7 @@ function resolveApiBase(): string {
   // When accessed remotely, use the remote IP for API
   if (typeof window !== "undefined") {
     const { origin, hostname, port } = window.location;
-    const isDevServer = port === "8080" || port === "8081" || port === "5173" || port === "4173";
+    const isDevServer = port === "8080" || port === "8081" || port === "8082" || port === "5173" || port === "4173";
     
     // If accessing from a remote IP, use that IP for the API
     if (isDevServer && (hostname !== "localhost" && hostname !== "127.0.0.1")) {
