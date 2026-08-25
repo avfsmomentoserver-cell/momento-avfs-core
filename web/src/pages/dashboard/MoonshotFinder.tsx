@@ -321,13 +321,13 @@ export default function MoonshotFinder() {
                           <div className="font-mono text-xs font-semibold text-violet">{multiplier(Number(moonshotSequenceQuery.data.prediction.predicted_multiplier) || 0)}x</div>
                         </div>
                         <div>
-                          <div className="text-[10px] text-muted-foreground mb-0.5">ETA Rounds</div>
-                          <div className="font-mono text-xs font-semibold">{integer(Number(moonshotSequenceQuery.data.prediction.estimated_rounds_until) || 0)}</div>
+                          <div className="text-[10px] text-muted-foreground mb-0.5">Bias Score</div>
+                          <div className="font-mono text-xs font-semibold">{(Number(moonshotSequenceQuery.data.prediction.weighted_growth_rate) || 0).toFixed(2)}</div>
                         </div>
                       </div>
                       
                       <div className="text-[10px] text-muted-foreground">
-                        Based on {integer(Number(moonshotSequenceQuery.data.prediction.similar_sequences_count) || 0)} similar sequences · {moonshotSequenceQuery.data.prediction.reason}
+                        Bias-based prediction · {moonshotSequenceQuery.data.prediction.reason}
                       </div>
                     </div>
                   ) : (

@@ -204,14 +204,14 @@ class MoonshotSequencePredictor:
         sequences: List[Dict[str, Any]],
         current_session: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
-        """Predict next moonshot based on deduced sequences.
+        """Predict next moonshot based on bias analysis of sequences.
         
         Args:
             sequences: Historical moonshot sequences
             current_session: Current session rounds
             
         Returns:
-            Prediction with confidence and expected moonshot properties
+            Prediction with bias-based confidence and expected moonshot properties
         """
         if not sequences:
             return {
@@ -227,115 +227,84 @@ class MoonshotSequencePredictor:
                 "reason": "No current session data"
             }
         
-        # Analyze current session state
+        # Calculate bias from sequence growth patterns
         current_multipliers = [r["multiplier"] for r in current_session]
-        current_peak = max(current_multipliers) if current_multipliers else 0.0
         current_avg = sum(current_multipliers) / len(current_multipliers) if current_multipliers else 0.0
+        current_last = current_multipliers[-1] if current_multipliers else 1.0
         
-        # Find similar historical sequences
-        similar_sequences = self._find_similar_sequences(sequences, current_session)
+        # Calculate bias score based on historical sequence analysis
+        bias_score = self._calculate_bias_score(sequences, current_session)
         
-        if not similar_sequences:
+        # Simple bias-based prediction: use bias as main indicator
+        # Higher bias score = higher moonshot probability
+        if bias_score > 0.5:
+            # Calculate predicted multiplier based on bias
+            growth_factor = 1.0 + (bias_score * 0.5)  # Up to 1.5x growth
+            predicted_multiplier = current_last * growth_factor
+            predicted_multiplier = max(self.extended_threshold, predicted_multiplier)
+            
+            return {
+                "predicted": True,
+                "confidence": round(bias_score, 4),
+                "predicted_multiplier": round(predicted_multiplier, 2),
+                "weighted_growth_rate": round(bias_score, 4),  # Use bias as growth rate
+                "current_multiplier": round(current_last, 2),
+                "threshold_used": self.extended_threshold,
+                "scale_factor": self.filtering_scale,
+                "reason": f"Bias-based prediction (score: {bias_score:.2f})"
+            }
+        else:
             return {
                 "predicted": False,
-                "confidence": 0.0,
-                "reason": "No similar historical sequences found"
+                "confidence": round(bias_score, 4),
+                "weighted_growth_rate": round(bias_score, 4),
+                "current_multiplier": round(current_last, 2),
+                "threshold_used": self.extended_threshold,
+                "scale_factor": self.filtering_scale,
+                "reason": f"Bias score too low ({bias_score:.2f})"
             }
-        
-        # Aggregate predictions from similar sequences
-        prediction = self._aggregate_sequence_predictions(similar_sequences, current_session)
-        
-        logger.info(f"Generated moonshot prediction with confidence {prediction['confidence']}")
-        return prediction
     
-    def _find_similar_sequences(
+    def _calculate_bias_score(
         self,
         sequences: List[Dict[str, Any]],
         current_session: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
-        """Find historical sequences similar to current session."""
+    ) -> float:
+        """Calculate bias score from historical sequences and current session.
+        
+        Args:
+            sequences: Historical moonshot sequences
+            current_session: Current session rounds
+            
+        Returns:
+            Bias score (0-1)
+        """
         current_multipliers = [r["multiplier"] for r in current_session]
         current_avg = sum(current_multipliers) / len(current_multipliers) if current_multipliers else 0.0
-        current_peak = max(current_multipliers) if current_multipliers else 0.0
         
-        similar_sequences = []
-        
+        # Calculate bias from historical sequence patterns
+        sequence_biases = []
         for seq in sequences:
-            # Compare session characteristics
-            avg_diff = abs(seq["avg_multiplier"] - current_avg) / max(1.0, current_avg)
-            peak_diff = abs(seq["peak_multiplier"] - current_peak) / max(1.0, current_peak)
-            
-            # Similarity score (lower is more similar)
-            similarity_score = (avg_diff * 0.6) + (peak_diff * 0.4)
-            
-            # Threshold for similarity (adjustable)
-            if similarity_score < 0.5:  # Within 50% similarity
-                seq_copy = seq.copy()
-                seq_copy["similarity_score"] = round(similarity_score, 4)
-                similar_sequences.append(seq_copy)
+            # Calculate bias from sequence growth rate
+            growth_rate = seq["sequence_growth"]["growth_rate"]
+            # Normalize growth rate to bias score (assuming growth rate range -1 to 1)
+            bias = (growth_rate + 1) / 2  # Convert to 0-1 range
+            bias = max(0.0, min(1.0, bias))
+            sequence_biases.append(bias)
         
-        # Sort by similarity (most similar first)
-        similar_sequences.sort(key=lambda x: x["similarity_score"])
+        if not sequence_biases:
+            return 0.0
         
-        # Return top 5 most similar sequences
-        return similar_sequences[:5]
-    
-    def _aggregate_sequence_predictions(
-        self,
-        similar_sequences: List[Dict[str, Any]],
-        current_session: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
-        """Aggregate predictions from similar sequences."""
-        if not similar_sequences:
-            return {
-                "predicted": False,
-                "confidence": 0.0,
-                "reason": "No similar sequences to aggregate"
-            }
+        # Average bias from historical sequences
+        avg_historical_bias = sum(sequence_biases) / len(sequence_biases)
         
-        # Calculate weighted average based on similarity
-        total_weight = sum(1.0 - seq["similarity_score"] for seq in similar_sequences)
+        # Calculate current session bias from multipliers
+        # Higher multipliers = higher bias
+        current_bias = min(1.0, current_avg / 20.0)  # Normalize against 20x
         
-        # Predict next multiplier based on sequence growth patterns
-        current_multipliers = [r["multiplier"] for r in current_session]
-        current_last = current_multipliers[-1] if current_multipliers else 1.0
+        # Blend historical and current bias
+        final_bias = (avg_historical_bias * 0.6) + (current_bias * 0.4)
         
-        # Aggregate growth rates
-        weighted_growth = 0.0
-        for seq in similar_sequences:
-            weight = (1.0 - seq["similarity_score"]) / total_weight
-            growth = seq["sequence_growth"]["growth_rate"]
-            weighted_growth += growth * weight
-        
-        # Predict next moonshot multiplier
-        predicted_multiplier = current_last * (1.0 + weighted_growth)
-        predicted_multiplier = max(self.extended_threshold, predicted_multiplier)
-        
-        # Calculate confidence based on similarity and sequence count
-        avg_similarity = sum(seq["similarity_score"] for seq in similar_sequences) / len(similar_sequences)
-        confidence = (1.0 - avg_similarity) * 0.7 + (len(similar_sequences) / 5.0) * 0.3
-        confidence = min(0.95, max(0.1, confidence))
-        
-        # Estimate rounds until next moonshot
-        avg_rounds_between = []
-        for seq in similar_sequences:
-            if seq["rounds_between_moonshots"]:
-                avg_rounds_between.extend(seq["rounds_between_moonshots"])
-        
-        estimated_rounds = int(sum(avg_rounds_between) / len(avg_rounds_between)) if avg_rounds_between else 10
-        
-        return {
-            "predicted": True,
-            "confidence": round(confidence, 4),
-            "predicted_multiplier": round(predicted_multiplier, 2),
-            "estimated_rounds_until": estimated_rounds,
-            "similar_sequences_count": len(similar_sequences),
-            "weighted_growth_rate": round(weighted_growth, 4),
-            "current_multiplier": round(current_last, 2),
-            "threshold_used": self.extended_threshold,
-            "scale_factor": self.filtering_scale,
-            "reason": f"Based on {len(similar_sequences)} similar historical sequences"
-        }
+        return round(final_bias, 4)
 
 
 def analyze_moonshot_sequences(

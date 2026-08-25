@@ -556,7 +556,7 @@ def _sigmoid(value: float) -> float:
 
 
 def ml_predictions(multipliers: Sequence[float], settings: AnalysisSettings) -> Dict[str, Any]:
-    """Logistic ensemble over the engineered features, blended with the empirical rate."""
+    """Bias-based moonshot prediction using simplified approach."""
     features = ml_features(multipliers, settings)
     if not features:
         return {"available": False, "note": "Need at least 8 rounds.", "features": {}, "predictions": {}}
@@ -565,20 +565,25 @@ def ml_predictions(multipliers: Sequence[float], settings: AnalysisSettings) -> 
     predictions: Dict[str, Any] = {}
 
     for target, weights in _ML_WEIGHTS.items():
-        z = weights["bias"]
-        for key, weight in weights.items():
-            if key == "bias":
-                continue
-            z += weight * features.get(key, 0.0)
-        model_prob = _sigmoid(z)
+        # Simplified bias-based prediction: use bias as primary indicator
+        bias = weights["bias"]
+        
+        # Calculate bias-based probability directly from bias value
+        # Higher negative bias = higher probability for that threshold
+        bias_prob = _sigmoid(-bias)  # Invert bias to get probability
+        
         threshold_key = target.replace("over_", "")
         empirical_prob = float(empirical.get(threshold_key, 0.0))
-        blended = analysis.clamp(model_prob * 0.6 + empirical_prob * 0.4)
+        
+        # Blend bias prediction with empirical data
+        blended = analysis.clamp(bias_prob * 0.7 + empirical_prob * 0.3)
+        
         predictions[target] = {
-            "model": round(model_prob, 4),
+            "bias": round(bias, 4),
+            "bias_probability": round(bias_prob, 4),
             "empirical": round(empirical_prob, 4),
             "blended": blended,
-            "edge": round(blended - empirical_prob, 4),
+            "prediction_bias": round(bias, 4),  # Simplified: use bias as main indicator
         }
 
     return {
@@ -586,5 +591,6 @@ def ml_predictions(multipliers: Sequence[float], settings: AnalysisSettings) -> 
         "features": features,
         "predictions": predictions,
         "samples": len(multipliers),
-        "model": "logistic-ensemble-v2",
+        "model": "bias-based-prediction-v1",
+        "note": "Simplified bias-based prediction using bias as primary indicator"
     }
