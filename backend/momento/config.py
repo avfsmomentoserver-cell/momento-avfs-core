@@ -10,7 +10,7 @@ import json
 import os
 from dataclasses import dataclass, asdict
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 
 def _root() -> Path:
@@ -86,6 +86,22 @@ CORS_ORIGINS = [
     if o.strip()
 ]
 ALLOW_ALL_CORS = _env_bool("MOMENTO_CORS_ALLOW_ALL", True)
+
+# AI settings from environment variables
+AI_OPTIMIZER_MIN_SAMPLES = _env_int("MOMENTO_AI_OPTIMIZER_MIN_SAMPLES", 3)
+AI_OPTIMIZER_CONFIDENCE_THRESHOLD = _env_float("MOMENTO_AI_OPTIMIZER_CONFIDENCE_THRESHOLD", 0.5)
+AI_OPTIMIZER_MAX_RUNTIME = _env_int("MOMENTO_AI_OPTIMIZER_MAX_RUNTIME", 600)
+
+AI_LEARNER_WINDOW_SIZE = _env_int("MOMENTO_AI_LEARNER_WINDOW_SIZE", 20)
+AI_LEARNER_MIN_SAMPLES = _env_int("MOMENTO_AI_LEARNER_MIN_SAMPLES", 10)
+AI_LEARNER_BALANCE_CLASSES = _env_bool("MOMENTO_AI_LEARNER_BALANCE_CLASSES", True)
+AI_LEARNER_FEATURE_THRESHOLD = _env_float("MOMENTO_AI_LEARNER_FEATURE_THRESHOLD", 0.1)
+
+AI_ML_ENABLED = _env_bool("MOMENTO_AI_ML_ENABLED", False)
+AI_ML_FRAMEWORK = os.environ.get("MOMENTO_AI_ML_FRAMEWORK", "sklearn")
+AI_ML_RANDOM_STATE = _env_int("MOMENTO_AI_ML_RANDOM_STATE", 42)
+AI_ML_TEST_SIZE = _env_float("MOMENTO_AI_ML_TEST_SIZE", 0.2)
+AI_ML_CV_FOLDS = _env_int("MOMENTO_AI_ML_CV_FOLDS", 5)
 
 
 @dataclass
@@ -230,12 +246,64 @@ class DashboardSettings:
         return DashboardSettings(**data)
 
 
+@dataclass
+class AISettings:
+    """AI/ML configuration for optimization and pattern learning."""
+
+    # Optimizer settings
+    optimizer_min_samples: int = AI_OPTIMIZER_MIN_SAMPLES
+    optimizer_confidence_threshold: float = AI_OPTIMIZER_CONFIDENCE_THRESHOLD
+    optimizer_max_runtime: int = AI_OPTIMIZER_MAX_RUNTIME  # seconds
+
+    # Pattern learner settings
+    learner_window_size: int = AI_LEARNER_WINDOW_SIZE
+    learner_min_samples: int = AI_LEARNER_MIN_SAMPLES
+    learner_balance_classes: bool = AI_LEARNER_BALANCE_CLASSES
+    learner_feature_threshold: float = AI_LEARNER_FEATURE_THRESHOLD
+
+    # ML settings
+    ml_enabled: bool = AI_ML_ENABLED
+    ml_framework: str = AI_ML_FRAMEWORK
+    ml_random_state: int = AI_ML_RANDOM_STATE
+    ml_test_size: float = AI_ML_TEST_SIZE
+    ml_cross_validation_folds: int = AI_ML_CV_FOLDS
+
+    def as_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+    def merge(self, values: Dict[str, Any]) -> "AISettings":
+        data = self.as_dict()
+        for key, value in values.items():
+            if key not in data or value is None:
+                continue
+            current = data[key]
+            try:
+                if isinstance(current, bool):
+                    data[key] = bool(value)
+                else:
+                    data[key] = int(value) if isinstance(current, int) else float(value)
+            except (TypeError, ValueError):
+                continue
+        return AISettings(**data)
+
+    def to_ai_config(self) -> Optional["AIConfig"]:
+        """Convert to AIConfig for use in AI modules."""
+        try:
+            from features.ai.config import AIConfig
+            return AIConfig.from_dict(self.as_dict())
+        except ImportError:
+            return None
+
+
 DEFAULT_SOURCES: list[dict[str, Any]] = [
     {"id": "aviator", "name": "Aviator", "icon": "plane", "active": True},
     {"id": "jetx", "name": "JetX", "icon": "rocket", "active": True},
     {"id": "crash", "name": "Crash", "icon": "zap", "active": True},
     {"id": "spaceman", "name": "Spaceman", "icon": "orbit", "active": False},
 ]
+
+# Default AI settings instance
+DEFAULT_AI_SETTINGS = AISettings()
 
 
 def ensure_directories() -> None:

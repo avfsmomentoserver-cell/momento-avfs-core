@@ -153,6 +153,59 @@ async def moonshot(
     }
 
 
+@router.get("/analysis/moonshot-sequence")
+async def moonshot_sequence(
+    source: str = Depends(source_param),
+    ingest_method: str = Query(default=None),
+    scale_factor: float = Query(default=1.0, ge=0.1, le=10.0),
+) -> Dict[str, Any]:
+    """Moonshot sequence prediction based on filtering rounds in sessions.
+    
+    Filters rounds by moonshot threshold scaled to ensure comprehensive coverage,
+    deduces sequences from sessions, and predicts next moonshot based on patterns.
+    
+    Args:
+        scale_factor: Threshold multiplier (1.0 = 10x threshold, 0.5 = 5x threshold)
+                     Lower values = more comprehensive (include lower multipliers)
+    """
+    try:
+        from ...moonshot_sequence_predictor import analyze_moonshot_sequences
+        
+        settings = store.analysis_settings()
+        rounds = store.history(source, settings.max_rounds_buffer * 2, ingest_method=ingest_method)
+        
+        if not rounds:
+            return {
+                "source": source,
+                "status": "error",
+                "error": "No rounds found for analysis"
+            }
+        
+        # Run moonshot sequence analysis with specified scale factor
+        result = analyze_moonshot_sequences(
+            rounds, 
+            settings, 
+            settings.session_gap_seconds,
+            scale_factor=scale_factor
+        )
+        
+        result["source"] = source
+        return result
+        
+    except ImportError:
+        return {
+            "source": source,
+            "status": "error",
+            "error": "Moonshot sequence predictor not available"
+        }
+    except Exception as e:
+        return {
+            "source": source,
+            "status": "error",
+            "error": str(e)
+        }
+
+
 @router.get("/analysis/ml")
 async def ml(
     source: str = Depends(source_param),

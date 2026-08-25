@@ -33,6 +33,13 @@ try:
 except ImportError:
     FEATURES_AVAILABLE = False
 
+# Import moonshot sequence predictor
+try:
+    from .moonshot_sequence_predictor import analyze_moonshot_sequences
+    MOONSHOT_SEQUENCE_PREDICTOR_AVAILABLE = True
+except ImportError:
+    MOONSHOT_SEQUENCE_PREDICTOR_AVAILABLE = False
+
 # Import alert manager
 try:
     from .feature_alerts import alert_manager
@@ -1274,6 +1281,17 @@ def analyze(rounds: Sequence[Round], settings: AnalysisSettings, toggles: config
         except Exception as e:
             logger.error(f"Alert checking failed: {e}")
 
+    # Moonshot sequence prediction
+    moonshot_sequence_analysis = {}
+    if MOONSHOT_SEQUENCE_PREDICTOR_AVAILABLE and len(rounds) >= 20:
+        try:
+            moonshot_sequence_analysis = analyze_moonshot_sequences(
+                rounds, settings, settings.session_gap_seconds, scale_factor=1.0
+            )
+        except Exception as e:
+            logger.error(f"Moonshot sequence analysis failed: {e}")
+            moonshot_sequence_analysis = {"error": str(e)}
+
     return {
         "source": rounds[-1].get("source") if rounds else None,
         "generated_at": datetime.utcnow().isoformat() + "Z",
@@ -1313,6 +1331,7 @@ def analyze(rounds: Sequence[Round], settings: AnalysisSettings, toggles: config
         "config": settings.as_dict(),
         "advanced_features": advanced_features,
         "alerts": alerts,
+        "moonshot_sequence_analysis": moonshot_sequence_analysis,
     }
 
 

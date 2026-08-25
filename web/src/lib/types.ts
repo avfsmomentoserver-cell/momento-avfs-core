@@ -529,6 +529,36 @@ export interface AutopilotStatus {
   pending: number;
 }
 
+export interface MegaplanPrediction {
+  market_state: "compression" | "release" | "transition";
+  next_range_targets: {
+    min: number;
+    max: number;
+    confidence: number;
+  };
+  forward_structure: {
+    predicted_sequence: number[];
+    angle: number;
+    direction: "upward" | "downward" | "sideways";
+  };
+  momentum_forecast: {
+    current_momentum: number;
+    release_probability: number;
+    cluster_prediction: {
+      likely: boolean;
+      timing: number;
+    };
+  };
+  consensus_score: number;
+  factors: {
+    sequence_angle: boolean;
+    momentum_compression: boolean;
+    time_candlestick: boolean;
+    market_state: boolean;
+  };
+  timestamp: string;
+}
+
 export interface EquityPoint {
   index: number;
   time: string;
@@ -936,6 +966,57 @@ export interface LadderSequence {
   end_index: number;
   length: number;
   collapse_point: number;
+}
+
+export interface MoonshotSequence {
+  session_index: number;
+  session_rounds_count: number;
+  moonshot_count: number;
+  multipliers: number[];
+  timestamps: string[];
+  threshold_used: number;
+  scale_factor: number;
+  peak_multiplier: number;
+  avg_multiplier: number;
+  sequence_growth: {
+    growth_rate: number;
+    acceleration: number;
+    volatility: number;
+  };
+  time_span: {
+    duration_seconds: number;
+    avg_seconds_between: number;
+  };
+  rounds_between_moonshots: number[];
+}
+
+export interface MoonshotSequencePrediction {
+  predicted: boolean;
+  confidence: number;
+  predicted_multiplier?: number;
+  estimated_rounds_until?: number;
+  similar_sequences_count?: number;
+  weighted_growth_rate?: number;
+  current_multiplier?: number;
+  threshold_used?: number;
+  scale_factor?: number;
+  reason?: string;
+}
+
+export interface MoonshotSequenceAnalysis {
+  status: string;
+  source?: string;
+  error?: string;
+  sessions_count?: number;
+  sequences_found?: number;
+  total_moonshots?: number;
+  avg_moonshots_per_session?: number;
+  peak_multiplier?: number;
+  sequences?: MoonshotSequence[];
+  prediction?: MoonshotSequencePrediction;
+  filtering_threshold?: number;
+  scale_factor?: number;
+  message?: string;
 }
 
 export interface BandLadderData {

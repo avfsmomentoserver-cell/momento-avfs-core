@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, Download, Flame, Gauge, Loader2, Rocket, Save, Sparkles } from "lucide-react";
+import { Activity, Download, Flame, Gauge, Loader2, Rocket, Save, Sparkles, ListOrdered } from "lucide-react";
 import { toast } from "sonner";
 
 import { PointsChart } from "@/components/charts/PointsChart";
@@ -21,10 +21,12 @@ import { SessionPanel } from "@/components/panels/SessionPanel";
 import { SignalPanel } from "@/components/panels/SignalPanel";
 import { TransitionsPanel } from "@/components/panels/TransitionsPanel";
 import { WarningsPanel } from "@/components/panels/WarningsPanel";
+import { CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { POLL } from "@/lib/config";
 import { decimal, integer, multiplier, percent } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/state/AuthProvider";
 import { usePlatform } from "@/state/PlatformProvider";
 
@@ -47,6 +49,20 @@ export default function CommandCenter() {
     staleTime: 1500,
   });
 
+  const megaplanQuery = useQuery({
+    queryKey: ["megaplan-prediction", source],
+    queryFn: () => api.megaplanPrediction(source, 250, true),
+    refetchInterval: POLL.analysis,
+    enabled: !!source,
+  });
+
+  const moonshotSequenceQuery = useQuery({
+    queryKey: ["moonshot-sequence", source],
+    queryFn: () => api.moonshotSequence(source, 1.0, "file"),
+    refetchInterval: POLL.analysis * 3,
+    enabled: !!source,
+  });
+
   const recordForecast = useMutation({
     mutationFn: () => api.recordForecast(source),
     onSuccess: (result) => {
@@ -63,6 +79,18 @@ export default function CommandCenter() {
   const confidence = analysis?.prediction_confidence.confidence ?? 0;
   const streaks = analysis?.streaks;
   const resistance = analysis?.signals.upper_resistance;
+
+  // Blend traditional confidence with megaplan consensus
+  const blendedConfidence = Math.max(
+    confidence,
+    megaplanQuery.data?.consensus_score ?? 0
+  );
+
+  // Enhanced moonshot probability with megaplan
+  const enhancedMoonshotProbability = Math.max(
+    analysis?.prediction_confidence.moonshot_probability ?? 0,
+    megaplanQuery.data?.consensus_score ?? 0
+  );
 
   return (
     <AppShell
@@ -95,27 +123,27 @@ export default function CommandCenter() {
             <StatTile
               label="Market state"
               value={<StateBadge state={analysis?.state} size="lg" pulse={analysis?.state === "Ignition" || analysis?.state === "Moonshot"} />}
-              hint={analysis?.state_meta.meaning}
+              hint={megaplanQuery.data?.market_state ? `${analysis?.state_meta.meaning} · megaplan: ${megaplanQuery.data.market_state}` : analysis?.state_meta.meaning}
               accent="neutral"
               emphasis
             />
             <StatTile
               label="Confidence"
-              value={percent(confidence)}
-              accent={confidence >= 0.66 ? "signal" : confidence >= 0.38 ? "caution" : "critical"}
-              progress={confidence}
-              hint={analysis?.forecast?.confidence_label ? `${analysis.forecast.confidence_label} conviction` : "blended read"}
+              value={percent(blendedConfidence)}
+              accent={blendedConfidence >= 0.66 ? "signal" : blendedConfidence >= 0.38 ? "caution" : "critical"}
+              progress={blendedConfidence}
+              hint={analysis?.forecast?.confidence_label ? `${analysis.forecast.confidence_label} conviction · megaplan ${percent(megaplanQuery.data?.consensus_score || 0)}` : `blended read · megaplan ${percent(megaplanQuery.data?.consensus_score || 0)}`}
               icon={<Gauge className="h-3.5 w-3.5" />}
             />
             <StatTile
               label="Moonshot probability"
-              value={percent(analysis?.prediction_confidence.moonshot_probability)}
+              value={percent(enhancedMoonshotProbability)}
               accent="info"
-              progress={analysis?.prediction_confidence.moonshot_probability ?? 0}
+              progress={enhancedMoonshotProbability}
               hint={
                 analysis?.band_exhaustion?.most_overdue
-                  ? `${analysis.band_exhaustion.most_overdue.label} ${decimal(analysis.band_exhaustion.most_overdue.overdue_ratio, 2)}x cadence`
-                  : "cadence warming up"
+                  ? `${analysis.band_exhaustion.most_overdue.label} ${decimal(analysis.band_exhaustion.most_overdue.overdue_ratio, 2)}x cadence · megaplan ${percent(megaplanQuery.data?.consensus_score || 0)}`
+                  : `cadence warming up · megaplan ${percent(megaplanQuery.data?.consensus_score || 0)}`
               }
               icon={<Rocket className="h-3.5 w-3.5" />}
             />
@@ -126,8 +154,8 @@ export default function CommandCenter() {
               progress={analysis?.prediction_confidence.ignition_probability ?? 0}
               hint={
                 analysis?.signals.nested
-                  ? `compression ${percent(analysis.signals.nested.compression)}`
-                  : "no compression measured"
+                  ? `compression ${percent(analysis.signals.nested.compression)} · megaplan momentum ${percent(megaplanQuery.data?.momentum_forecast?.current_momentum || 0)}`
+                  : `no compression measured · megaplan momentum ${percent(megaplanQuery.data?.momentum_forecast?.current_momentum || 0)}`
               }
               icon={<Flame className="h-3.5 w-3.5" />}
             />
@@ -174,6 +202,202 @@ export default function CommandCenter() {
               <PressurePanel pressure={analysis?.advanced_features?.pressure} />
               <BaselinePanel baseline={analysis?.advanced_features?.baseline} />
               <MoonshotPanel moonshot={analysis?.advanced_features?.moonshot} />
+              
+              {/* Moonshot Sequence Analysis Panel */}
+              <div className={cn(
+                "rounded-lg border bg-muted/15 p-3",
+                moonshotSequenceQuery.data?.prediction?.predicted && moonshotSequenceQuery.data?.prediction?.confidence > 0.7 && "border-violet/50 bg-violet/10"
+              )}>
+                <div className="flex items-center gap-2 mb-3">
+                  <ListOrdered className={cn(
+                    "h-3.5 w-3.5",
+                    moonshotSequenceQuery.data?.prediction?.predicted && moonshotSequenceQuery.data?.prediction?.confidence > 0.7 ? "text-violet" : "text-muted-foreground"
+                  )} />
+                  <div>
+                    <p className="text-xs font-semibold">Moonshot Sequences</p>
+                    <p className="text-[10px] text-muted-foreground">session filtering · pattern deduction</p>
+                  </div>
+                </div>
+                
+                {moonshotSequenceQuery.isLoading ? (
+                  <div className="flex h-16 items-center justify-center text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  </div>
+                ) : moonshotSequenceQuery.data?.status === "error" ? (
+                  <div className="text-[10px] text-muted-foreground">
+                    {moonshotSequenceQuery.data?.error || "Analysis unavailable"}
+                  </div>
+                ) : moonshotSequenceQuery.data ? (
+                  <div className="space-y-2">
+                    {/* Quick Stats */}
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <div className="text-center">
+                        <div className="text-[9px] text-muted-foreground">Sequences</div>
+                        <div className="font-mono text-xs font-semibold">{integer(moonshotSequenceQuery.data.sequences_found || 0)}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-[9px] text-muted-foreground">Moonshots</div>
+                        <div className="font-mono text-xs font-semibold">{integer(moonshotSequenceQuery.data.total_moonshots || 0)}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-[9px] text-muted-foreground">Peak</div>
+                        <div className="font-mono text-xs font-semibold text-violet">{multiplier(moonshotSequenceQuery.data.peak_multiplier || 0)}x</div>
+                      </div>
+                    </div>
+
+                    {/* Prediction Status */}
+                    {moonshotSequenceQuery.data.prediction && (
+                      <div className={cn(
+                        "rounded-md border px-2 py-1.5",
+                        moonshotSequenceQuery.data.prediction.predicted && moonshotSequenceQuery.data.prediction.confidence > 0.5
+                          ? "border-violet/30 bg-violet/5" 
+                          : "border-border/30 bg-muted/10"
+                      )}>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] text-muted-foreground">Prediction</span>
+                          <span className={cn(
+                            "font-mono text-[10px]",
+                            moonshotSequenceQuery.data.prediction.predicted ? "text-violet" : "text-muted-foreground"
+                          )}>
+                            {moonshotSequenceQuery.data.prediction.predicted 
+                              ? `${multiplier(moonshotSequenceQuery.data.prediction.predicted_multiplier || 0)}x` 
+                              : "—"}
+                          </span>
+                        </div>
+                        {moonshotSequenceQuery.data.prediction.predicted && (
+                          <div className="mt-1 flex items-center justify-between">
+                            <span className="text-[9px] text-muted-foreground">Confidence</span>
+                            <span className="font-mono text-[9px] text-violet">{percent(moonshotSequenceQuery.data.prediction.confidence || 0)}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-[10px] text-muted-foreground">
+                    No sequence data available
+                  </div>
+                )}
+              </div>
+              
+              {/* Megaplan Prediction Panel */}
+              <div className={cn(
+                "rounded-lg border bg-muted/15 p-3",
+                megaplanQuery.data?.consensus_score > 0.7 && "border-signal/50 bg-signal/10"
+              )}>
+                <div className="flex items-center gap-2 mb-3">
+                  <Activity className={cn(
+                    "h-3.5 w-3.5",
+                    megaplanQuery.data?.consensus_score > 0.7 ? "text-signal" : "text-muted-foreground"
+                  )} />
+                  <div>
+                    <p className="text-xs font-semibold">Megaplan Prediction</p>
+                    <p className="text-[10px] text-muted-foreground">sequence angle · momentum compression · market state consensus</p>
+                  </div>
+                </div>
+                
+                {megaplanQuery.isLoading ? (
+                  <div className="flex h-20 items-center justify-center text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  </div>
+                ) : megaplanQuery.data ? (
+                  <div className="space-y-3">
+                    {/* Consensus Score */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-muted-foreground">Consensus Score</span>
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 w-20 overflow-hidden rounded-full bg-muted">
+                          <div 
+                            className="h-full rounded-full transition-all"
+                            style={{ 
+                              width: `${(megaplanQuery.data.consensus_score || 0) * 100}%`,
+                              backgroundColor: megaplanQuery.data.consensus_score > 0.7 ? 'hsl(var(--signal))' : 
+                                            megaplanQuery.data.consensus_score > 0.4 ? 'hsl(var(--caution))' : 'hsl(var(--critical))'
+                            }}
+                          />
+                        </div>
+                        <span className="font-mono text-xs tabular-nums">{percent(megaplanQuery.data.consensus_score || 0)}</span>
+                      </div>
+                    </div>
+
+                    {/* Factor Status */}
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <div className="flex items-center gap-1.5 rounded-md border border-border/40 bg-muted/15 px-2 py-1.5">
+                        {megaplanQuery.data.factors.sequence_angle ? (
+                          <CheckCircle2 className="h-3 w-3 text-signal" />
+                        ) : (
+                          <XCircle className="h-3 w-3 text-critical" />
+                        )}
+                        <span className="text-[10px] text-muted-foreground">Sequence</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 rounded-md border border-border/40 bg-muted/15 px-2 py-1.5">
+                        {megaplanQuery.data.factors.momentum_compression ? (
+                          <CheckCircle2 className="h-3 w-3 text-signal" />
+                        ) : (
+                          <XCircle className="h-3 w-3 text-critical" />
+                        )}
+                        <span className="text-[10px] text-muted-foreground">Momentum</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 rounded-md border border-border/40 bg-muted/15 px-2 py-1.5">
+                        {megaplanQuery.data.factors.time_candlestick ? (
+                          <CheckCircle2 className="h-3 w-3 text-signal" />
+                        ) : (
+                          <XCircle className="h-3 w-3 text-critical" />
+                        )}
+                        <span className="text-[10px] text-muted-foreground">Time Candle</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 rounded-md border border-border/40 bg-muted/15 px-2 py-1.5">
+                        {megaplanQuery.data.factors.market_state ? (
+                          <CheckCircle2 className="h-3 w-3 text-signal" />
+                        ) : (
+                          <XCircle className="h-3 w-3 text-critical" />
+                        )}
+                        <span className="text-[10px] text-muted-foreground">Market State</span>
+                      </div>
+                    </div>
+
+                    {/* Key Metrics */}
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <div className="text-center">
+                        <div className="text-[10px] text-muted-foreground mb-0.5">Market State</div>
+                        <div className={cn(
+                          "font-mono text-xs font-semibold",
+                          megaplanQuery.data.market_state === 'release' && "text-signal",
+                          megaplanQuery.data.market_state === 'compression' && "text-caution",
+                          megaplanQuery.data.market_state === 'transition' && "text-info"
+                        )}>
+                          {megaplanQuery.data.market_state}
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-[10px] text-muted-foreground mb-0.5">Upside</div>
+                        <div className={cn(
+                          "font-mono text-xs font-semibold",
+                          (megaplanQuery.data.next_range_targets?.confidence || 0) > 0.7 && "text-signal",
+                          (megaplanQuery.data.next_range_targets?.confidence || 0) > 0.4 && "text-info",
+                          (megaplanQuery.data.next_range_targets?.confidence || 0) <= 0.4 && "text-muted-foreground"
+                        )}>
+                          {multiplier(megaplanQuery.data.next_range_targets?.max || 10)}x
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Actionable Insight */}
+                    {(megaplanQuery.data?.consensus_score || 0) > 0.7 && (
+                      <div className="rounded-md border border-signal/30 bg-signal/5 px-2 py-1.5">
+                        <p className="text-[10px] text-signal font-medium">
+                          High consensus · Consider entering position
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex h-20 items-center justify-center text-muted-foreground text-xs">
+                    No megaplan data available
+                  </div>
+                )}
+              </div>
+              
               <BandAnalysisPanel bands={analysis?.advanced_features?.bands} bandRelativity={analysis?.advanced_features?.band_relativity} />
             </div>
 

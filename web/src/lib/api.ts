@@ -32,9 +32,11 @@ import type {
   HouseEdge,
   IngestLogEntry,
   LinguisticsPayload,
+  MegaplanPrediction,
   MegaScore,
   MlPredictions,
   MoonshotEta,
+  MoonshotSequenceAnalysis,
   OrchestratorModule,
   OrchestratorPlan,
   PhaseSample,
@@ -261,6 +263,20 @@ export const api = {
     request<{ source: string; eta: MoonshotEta[]; mega_scores: MegaScore[]; band_exhaustion: AnalysisPayload["band_exhaustion"]; dna: DnaReport }>(
       `/analysis/moonshot${qs({ source, ingest_method: ingestMethod })}`,
     ),
+  moonshotSequence: (source: string, scaleFactor = 1.0, ingestMethod?: string) =>
+    request<MoonshotSequenceAnalysis>(
+      `/analysis/moonshot-sequence${qs({ source, scale_factor: scaleFactor, ingest_method: ingestMethod })}`,
+    ),
+  megaplanPrediction: (source: string, analysisWindow?: number, computedConsensus?: boolean) =>
+    request<{
+      market_state: string;
+      next_range_targets: { min: number; max: number; confidence: number };
+      forward_structure: { predicted_sequence: number[]; angle: number; direction: string };
+      momentum_forecast: { current_momentum: number; release_probability: number; cluster_prediction: { likely: boolean; timing: number } };
+      consensus_score: number;
+      factors: { sequence_angle: boolean; momentum_compression: boolean; time_candlestick: boolean; market_state: boolean };
+      timestamp: string;
+    }>(`/megaplan/prediction${qs({ source, analysis_window: analysisWindow, computed_consensus: computedConsensus })}`),
   ml: (source: string, ingestMethod?: string) =>
     request<MlPredictions & { source: string }>(`/analysis/ml${qs({ source, ingest_method: ingestMethod })}`),
   runPlugins: (source: string, ingestMethod?: string) =>

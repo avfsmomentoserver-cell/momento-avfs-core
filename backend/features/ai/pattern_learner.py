@@ -3,6 +3,8 @@
 import logging
 from typing import Any, Dict, List, Optional
 
+from .config import AIConfig
+
 logger = logging.getLogger("features.ai.pattern_learner")
 
 # Try to import scikit-learn for ML capabilities
@@ -18,27 +20,29 @@ except ImportError:
 class MoonshotPatternLearner:
     """Learn moonshot patterns from historical data using ML."""
     
-    def __init__(self, use_ml: bool = True) -> None:
+    def __init__(self, config: Optional[AIConfig] = None, use_ml: bool = True) -> None:
+        self.config = config or AIConfig()
         self.patterns: List[Dict[str, Any]] = []
         self.feature_importance: Dict[str, float] = {}
-        self.use_ml = use_ml and SKLEARN_AVAILABLE
+        self.use_ml = use_ml and self.config.ml_enabled and SKLEARN_AVAILABLE
         self.model = None
         self.feature_names: List[str] = []
     
     def extract_features(
         self,
         rounds: List[Dict[str, Any]],
-        window: int = 20
+        window: Optional[int] = None
     ) -> List[Dict[str, Any]]:
         """Extract features from pre-moonshot windows.
         
         Args:
             rounds: Historical rounds
-            window: Window size before moonshot
+            window: Window size before moonshot (uses config default if not provided)
             
         Returns:
             List of feature dictionaries
         """
+        window = window or self.config.learner_window_size
         features = []
         
         # Find moonshot events
@@ -51,7 +55,7 @@ class MoonshotPatternLearner:
             start = max(0, idx - window)
             pre_rounds = rounds[start:idx]
             
-            if len(pre_rounds) < 5:  # Need at least 5 rounds
+            if len(pre_rounds) < self.config.learner_min_samples:
                 continue
             
             feature = self._compute_window_features(pre_rounds)
@@ -64,11 +68,14 @@ class MoonshotPatternLearner:
             if r["multiplier"] < 10.0
         ]
         
-        for idx in non_moonshot_indices[:len(moonshot_indices)]:  # Balance classes
+        # Balance classes if enabled in config
+        sample_size = len(moonshot_indices) if self.config.learner_balance_classes else len(non_moonshot_indices)
+        
+        for idx in non_moonshot_indices[:sample_size]:
             start = max(0, idx - window)
             pre_rounds = rounds[start:idx]
             
-            if len(pre_rounds) < 5:
+            if len(pre_rounds) < self.config.learner_min_samples:
                 continue
             
             feature = self._compute_window_features(pre_rounds)
@@ -179,14 +186,14 @@ class MoonshotPatternLearner:
         try:
             # Split data for validation
             X_train, X_test, y_train, y_test = train_test_split(
-                X, y, test_size=0.2, random_state=42, stratify=y
+                X, y, test_size=self.config.ml_test_size, random_state=self.config.ml_random_state, stratify=y
             )
             
             # Train Random Forest classifier
             self.model = RandomForestClassifier(
                 n_estimators=100,
                 max_depth=10,
-                random_state=42,
+                random_state=self.config.ml_random_state,
                 class_weight='balanced'
             )
             self.model.fit(X_train, y_train)
@@ -202,7 +209,7 @@ class MoonshotPatternLearner:
             patterns = self._generate_patterns_from_model(features, feature_names, feature_importance)
             
             # Cross-validation score
-            cv_scores = cross_val_score(self.model, X, y, cv=5)
+            cv_scores = cross_val_score(self.model, X, y, cv=self.config.ml_cross_validation_folds)
             
             return {
                 "patterns": patterns,
@@ -344,7 +351,13 @@ class MoonshotPatternLearner:
             correlation = self._calculate_correlation(values, targets)
             importance[name] = round(abs(correlation), 4)
         
-        return importance
+        # Filter features below threshold from config
+        filtered_importance = {
+            k: v for k, v in importance.items() 
+            if v >= self.config.learner_feature_threshold
+        }
+        
+        return filtered_importance
     
     def _calculate_correlation(self, x: List[float], y: List[int]) -> float:
         """Calculate correlation between two lists.

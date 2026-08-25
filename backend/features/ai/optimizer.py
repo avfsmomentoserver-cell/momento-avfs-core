@@ -8,13 +8,16 @@ import logging
 import statistics
 from typing import Any, Dict, List, Optional
 
+from .config import AIConfig
+
 logger = logging.getLogger("momento.ai.optimizer")
 
 
 class BacktestOptimizer:
     """Optimize backtest configurations using historical data."""
     
-    def __init__(self) -> None:
+    def __init__(self, config: Optional[AIConfig] = None) -> None:
+        self.config = config or AIConfig()
         self.historical_results: List[Dict[str, Any]] = []
     
     def add_result(self, result: Dict[str, Any]) -> None:
@@ -39,6 +42,10 @@ class BacktestOptimizer:
         """
         if not self.historical_results:
             return {"suggested_gap": 300, "confidence": 0.0, "reason": "No historical data"}
+        
+        # Check minimum sample size from config
+        if len(self.historical_results) < self.config.optimizer_min_samples:
+            return {"suggested_gap": 300, "confidence": 0.0, "reason": f"Insufficient samples (need {self.config.optimizer_min_samples})"}
         
         # Extract session gaps and accuracies
         gap_accuracies = []
@@ -72,6 +79,16 @@ class BacktestOptimizer:
         sample_size = len(gap_groups.get(best_gap, []))
         confidence = min(sample_size / 10.0, 1.0)  # Max confidence at 10 samples
         
+        # Apply confidence threshold from config
+        if confidence < self.config.optimizer_confidence_threshold:
+            return {
+                "suggested_gap": best_gap,
+                "confidence": round(confidence, 2),
+                "average_accuracy": round(best_avg_acc, 4),
+                "sample_size": sample_size,
+                "reason": f"Confidence below threshold ({self.config.optimizer_confidence_threshold})"
+            }
+        
         return {
             "suggested_gap": best_gap,
             "confidence": round(confidence, 2),
@@ -91,6 +108,10 @@ class BacktestOptimizer:
         """
         if not self.historical_results:
             return {"suggested_window": 5000, "confidence": 0.0, "reason": "No historical data"}
+        
+        # Check minimum sample size from config
+        if len(self.historical_results) < self.config.optimizer_min_samples:
+            return {"suggested_window": 5000, "confidence": 0.0, "reason": f"Insufficient samples (need {self.config.optimizer_min_samples})"}
         
         # Extract window sizes and accuracies
         window_accuracies = []
@@ -124,6 +145,16 @@ class BacktestOptimizer:
         sample_size = len(window_groups.get(best_window, []))
         confidence = min(sample_size / 10.0, 1.0)
         
+        # Apply confidence threshold from config
+        if confidence < self.config.optimizer_confidence_threshold:
+            return {
+                "suggested_window": best_window,
+                "confidence": round(confidence, 2),
+                "average_accuracy": round(best_avg_acc, 4),
+                "sample_size": sample_size,
+                "reason": f"Confidence below threshold ({self.config.optimizer_confidence_threshold})"
+            }
+        
         return {
             "suggested_window": best_window,
             "confidence": round(confidence, 2),
@@ -151,6 +182,14 @@ class BacktestOptimizer:
                 "suggested_toggles": {},
                 "confidence": 0.0,
                 "reason": "No historical data"
+            }
+        
+        # Check minimum sample size from config
+        if len(self.historical_results) < self.config.optimizer_min_samples:
+            return {
+                "suggested_toggles": {},
+                "confidence": 0.0,
+                "reason": f"Insufficient samples (need {self.config.optimizer_min_samples})"
             }
         
         # Extract feature toggles and accuracies
@@ -191,6 +230,16 @@ class BacktestOptimizer:
         # Calculate confidence
         sample_size = len(toggle_groups.get(tuple(sorted(best_toggles.items())), []))
         confidence = min(sample_size / 10.0, 1.0)
+        
+        # Apply confidence threshold from config
+        if confidence < self.config.optimizer_confidence_threshold:
+            return {
+                "suggested_toggles": best_toggles,
+                "confidence": round(confidence, 2),
+                "average_accuracy": round(best_avg_acc, 4),
+                "sample_size": sample_size,
+                "reason": f"Confidence below threshold ({self.config.optimizer_confidence_threshold})"
+            }
         
         return {
             "suggested_toggles": best_toggles,

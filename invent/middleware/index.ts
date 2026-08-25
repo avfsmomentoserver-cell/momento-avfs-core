@@ -47,3 +47,25 @@ export type {
   Position,
   Portfolio
 } from './momentoFX';
+
+// Megaplan Moonshot Prediction System
+export { megaplanPredictionEngine, getEnhancedPressureAnalysis } from './megaplanPrediction';
+export { sequenceAngleAnalyzer } from './sequenceAngleAnalyzer';
+export { timeBasedCandlestickProcessor } from './timeBasedCandlestickProcessor';
+export { momentumCompressionAnalyzer } from './momentumCompressionAnalyzer';
+export { marketStateClassifier } from './marketStateClassifier';
+export type {
+  MegaplanPrediction,
+  FactorPrediction,
+  ConsensusResult,
+  MegaplanConfig,
+  SequenceAngleAnalysis,
+  SequencePattern,
+  TimeBasedCandlestick,
+  RoundTimeData,
+  MegaplanTimeframe,
+  MomentumCompressionAnalysis,
+  CompressionReleasePattern,
+  MarketStateAnalysis,
+  EnergyIndicator
+} from './megaplan-types';

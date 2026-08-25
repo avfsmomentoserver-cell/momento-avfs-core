@@ -15,6 +15,28 @@
   "skills_directory": "./skills/",
   "workflows_directory": "./workflows/",
   "coding_standards": "./CODING_STANDARDS.md",
+  "read_config_from": {
+    "cursor": true,
+    "windsurf": true,
+    "claude": true
+  },
+  "permissions": {
+    "allow": [
+      "Read(**)",
+      "Write(**)",
+      "Exec(git)",
+      "Exec(python3)",
+      "Exec(bun)",
+      "Exec(node)",
+      "Exec(npm)"
+    ],
+    "deny": [
+      "Exec(sudo)",
+      "Exec(rm -rf)",
+      "Write(**/.env*)"
+    ],
+    "ask": []
+  },
   "behavior": {
     "fallback_hierarchy": [
       "skills",
