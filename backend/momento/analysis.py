@@ -1281,16 +1281,9 @@ def analyze(rounds: Sequence[Round], settings: AnalysisSettings, toggles: config
         except Exception as e:
             logger.error(f"Alert checking failed: {e}")
 
-    # Moonshot sequence prediction
-    moonshot_sequence_analysis = {}
-    if MOONSHOT_SEQUENCE_PREDICTOR_AVAILABLE and len(rounds) >= 20:
-        try:
-            moonshot_sequence_analysis = analyze_moonshot_sequences(
-                rounds, settings, settings.session_gap_seconds, scale_factor=1.0
-            )
-        except Exception as e:
-            logger.error(f"Moonshot sequence analysis failed: {e}")
-            moonshot_sequence_analysis = {"error": str(e)}
+    # Moonshot sequence prediction - removed from main analysis to prevent blocking
+    # This is now handled in store.py after forecast generation
+    moonshot_sequence_analysis = None
 
     return {
         "source": rounds[-1].get("source") if rounds else None,
@@ -1331,7 +1324,6 @@ def analyze(rounds: Sequence[Round], settings: AnalysisSettings, toggles: config
         "config": settings.as_dict(),
         "advanced_features": advanced_features,
         "alerts": alerts,
-        "moonshot_sequence_analysis": moonshot_sequence_analysis,
     }
 
 

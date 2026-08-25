@@ -484,6 +484,7 @@ def analysis_payload(source: str, limit: int = 600, use_cache: bool = True, inge
 
     payload = analysis.analyze(rounds, settings, toggles)
 
+    # Forecast generation (always runs regardless of sequence analysis)
     if toggles.forecast_engine:
         fc = forecast.forecast(rounds, settings, payload)
         payload["forecast"] = fc
@@ -491,6 +492,20 @@ def analysis_payload(source: str, limit: int = 600, use_cache: bool = True, inge
     else:
         payload["forecast"] = None
         payload["predictions"] = []
+
+    # Moonshot sequence analysis (runs after forecast, completely optional)
+    # This ensures it never blocks the main forecast from updating
+    if analysis.MOONSHOT_SEQUENCE_PREDICTOR_AVAILABLE and len(rounds) >= 20:
+        try:
+            from .moonshot_sequence_predictor import analyze_moonshot_sequences
+            payload["moonshot_sequence_analysis"] = analyze_moonshot_sequences(
+                rounds, settings, settings.session_gap_seconds, scale_factor=1.0
+            )
+        except Exception as e:
+            logger.error(f"Moonshot sequence analysis failed (non-blocking): {e}")
+            payload["moonshot_sequence_analysis"] = {"status": "error", "error": str(e)}
+    else:
+        payload["moonshot_sequence_analysis"] = {"status": "disabled", "reason": "Insufficient rounds or predictor unavailable"}
 
     payload["transitions"] = analysis.state_transitions(rounds, settings) if toggles.signal_engine else []
     payload["accuracy"] = forecast.accuracy(source)
