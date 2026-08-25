@@ -1,4 +1,4 @@
-import { Telescope, BarChart3 } from "lucide-react";
+import { Telescope, BarChart3, Zap } from "lucide-react";
 
 import { EmptyState } from "@/components/console/EmptyState";
 import { Panel } from "@/components/console/Panel";
@@ -6,10 +6,18 @@ import { Ring } from "@/components/console/Ring";
 import { StateBadge } from "@/components/console/StateBadge";
 import { decimal, multiplier, percent, stateColor } from "@/lib/format";
 import type { ForecastResult } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 interface ForecastPanelProps {
   forecast: ForecastResult | null | undefined;
   actions?: React.ReactNode;
+  unifiedTarget?: number;
+  forecastReady?: boolean;
+  factorContributions?: {
+    traditional: number;
+    megaplan: number;
+    sequence: number;
+  };
   metrics?: {
     precision?: number;
     recall?: number;
@@ -23,34 +31,59 @@ interface ForecastPanelProps {
 }
 
 /** The headline forecast: predicted state, confidence ring and target range. */
-export function ForecastPanel({ forecast, actions, metrics }: ForecastPanelProps) {
+export function ForecastPanel({ forecast, actions, unifiedTarget, forecastReady, factorContributions, metrics }: ForecastPanelProps) {
+  // Calculate blended confidence from all factors with NaN protection
+  const blendedConfidence = factorContributions 
+    ? Math.max(
+        Number(factorContributions.traditional) || 0, 
+        Number(factorContributions.megaplan) || 0, 
+        Number(factorContributions.sequence) || 0
+      )
+    : Number(forecast?.confidence) || 0;
+
+  // Determine if we should show unified target with NaN protection
+  const showUnifiedTarget = unifiedTarget && 
+    !isNaN(unifiedTarget) && 
+    unifiedTarget > (Number(forecast?.expected_multiplier) || 0);
+
   return (
-    <Panel title="Forecast" subtitle="Next-round projection" icon={<Telescope className="h-3.5 w-3.5" />} actions={actions} lit>
+    <Panel 
+      title="Forecast" 
+      subtitle={forecastReady ? "Real-time prediction active" : "Next-round projection"} 
+      icon={<Telescope className="h-3.5 w-3.5" />} 
+      actions={actions} 
+      lit={forecastReady}
+      className={forecastReady ? "border-l-4 border-l-signal" : undefined}
+    >
       {!forecast ? (
         <EmptyState compact title="Forecast engine idle" description="Enable the forecast engine and ingest more rounds." />
       ) : (
         <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
           <Ring
-            value={forecast.confidence}
+            value={blendedConfidence}
             size={124}
             color={stateColor(forecast.predicted_state)}
-            label={percent(forecast.confidence)}
-            sublabel={forecast.confidence_label ?? "confidence"}
+            label={percent(blendedConfidence)}
+            sublabel={forecastReady ? "unified confidence" : (forecast.confidence_label ?? "confidence")}
           />
 
           <div className="min-w-0 flex-1 space-y-3">
             <div className="flex flex-wrap items-center gap-2">
-              <StateBadge state={forecast.predicted_state} pulse />
+              <StateBadge state={forecast.predicted_state} pulse={forecastReady} />
               <span className="chip-muted">{forecast.predicted_band} band</span>
               <span className="chip-info">h+{forecast.horizon}</span>
+              {forecastReady && <Zap className="h-3 w-3 text-signal animate-pulse" />}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <p className="hud-label">Expected</p>
                 <p className="mt-0.5 font-mono text-xl font-semibold tabular-nums text-signal">
-                  {multiplier(forecast.expected_multiplier)}
+                  {showUnifiedTarget ? multiplier(unifiedTarget) : multiplier(forecast.expected_multiplier)}
                 </p>
+                {showUnifiedTarget && (
+                  <p className="text-[10px] text-muted-foreground">unified target</p>
+                )}
               </div>
               <div>
                 <p className="hud-label">Range</p>
@@ -59,6 +92,41 @@ export function ForecastPanel({ forecast, actions, metrics }: ForecastPanelProps
                 </p>
               </div>
             </div>
+
+            {factorContributions && (
+              <div className="space-y-2">
+                <p className="hud-label">Factor Contributions</p>
+                <div className="flex flex-wrap gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-1.5 w-12 overflow-hidden rounded-full bg-muted">
+                      <div 
+                        className="h-full rounded-full bg-info transition-all" 
+                        style={{ width: `${factorContributions.traditional * 100}%` }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-muted-foreground">traditional {percent(factorContributions.traditional)}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-1.5 w-12 overflow-hidden rounded-full bg-muted">
+                      <div 
+                        className="h-full rounded-full bg-signal transition-all" 
+                        style={{ width: `${factorContributions.megaplan * 100}%` }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-muted-foreground">megaplan {percent(factorContributions.megaplan)}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-1.5 w-12 overflow-hidden rounded-full bg-muted">
+                      <div 
+                        className="h-full rounded-full bg-violet transition-all" 
+                        style={{ width: `${factorContributions.sequence * 100}%` }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-muted-foreground">sequence {percent(factorContributions.sequence)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {forecast.note && <p className="text-[11px] leading-relaxed text-muted-foreground">{forecast.note}</p>}
 

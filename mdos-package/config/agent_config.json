@@ -30,6 +30,7 @@
       "skill_priority": "high",
       "auto_delegate_tasks": true,
       "automatic_delegation": true,
+      "auto_delegate_to_agents": true,
       "collect_requirements_first": true,
       "requirement_gathering": {
         "enabled": true,
@@ -46,6 +47,7 @@
       "delegation_rules": {
         "use_skills_first": true,
         "route_by_domain": true,
+        "delegate_to_specialists": true,
         "preserve_context": true,
         "create_tasks": true,
         "assign_specialists": true

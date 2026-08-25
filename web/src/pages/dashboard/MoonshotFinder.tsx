@@ -32,26 +32,26 @@ export default function MoonshotFinder() {
   const megaplanQuery = useQuery({
     queryKey: ["megaplan", source],
     queryFn: () => api.megaplanPrediction(source, 250, true),
-    refetchInterval: POLL.analysis * 2,
+    refetchInterval: POLL.realtime, // Faster for real-time updates
   });
 
   // Moonshot sequence prediction
   const moonshotSequenceQuery = useQuery({
     queryKey: ["moonshot-sequence", source],
     queryFn: () => api.moonshotSequence(source, 1.0, "file"),
-    refetchInterval: POLL.analysis * 3,
+    refetchInterval: POLL.analysis, // Faster than before
     enabled: !!source,
   });
 
-  // Overall ripeness blends the most overdue band with ladder + compression energy + megaplan consensus.
+  // Overall ripeness blends the most overdue band with ladder + compression energy + megaplan consensus with NaN protection
   const ripeness = Math.max(
     0,
     Math.min(
       1,
-      (overdue?.exhaustion ?? 0) * 0.45 +
-        (analysis?.signals.ascending_ladder?.strength ?? 0) * 0.20 +
-        (analysis?.signals.nested?.compression ?? 0) * 0.15 +
-        (megaplanQuery.data?.consensus_score ?? 0) * 0.20,
+      (Number(overdue?.exhaustion) || 0) * 0.45 +
+        (Number(analysis?.signals.ascending_ladder?.strength) || 0) * 0.20 +
+        (Number(analysis?.signals.nested?.compression) || 0) * 0.15 +
+        (Number(megaplanQuery.data?.consensus_score) || 0) * 0.20,
     ),
   );
 
@@ -86,16 +86,16 @@ export default function MoonshotFinder() {
                 label="Moonshot probability"
                 value={percent(
                   Math.max(
-                    analysis?.prediction_confidence.moonshot_probability ?? 0,
-                    megaplanQuery.data?.consensus_score ?? 0
+                    Number(analysis?.prediction_confidence.moonshot_probability) || 0,
+                    Number(megaplanQuery.data?.consensus_score) || 0
                   )
                 )}
                 accent="info"
                 progress={Math.max(
-                  analysis?.prediction_confidence.moonshot_probability ?? 0,
-                  megaplanQuery.data?.consensus_score ?? 0
+                  Number(analysis?.prediction_confidence.moonshot_probability) || 0,
+                  Number(megaplanQuery.data?.consensus_score) || 0
                 )}
-                hint={`10x share ${percent(analysis?.distribution["10x"], 1)} · megaplan ${percent(megaplanQuery.data?.consensus_score || 0)}`}
+                hint={`10x share ${percent(analysis?.distribution["10x"], 1)} · megaplan ${percent(Number(megaplanQuery.data?.consensus_score) || 0)}`}
               />
               <StatTile
                 label="DNA analogues"
@@ -112,7 +112,7 @@ export default function MoonshotFinder() {
           title="Megaplan Prediction" 
           subtitle="sequence angle · momentum compression · market state consensus" 
           icon={<Activity className="h-3.5 w-3.5" />}
-          lit={megaplanQuery.data?.consensus_score > 0.7}
+          lit={(Number(megaplanQuery.data?.consensus_score) || 0) > 0.7}
           className="border-l-4 border-l-signal"
         >
           {megaplanQuery.isLoading ? (
@@ -286,7 +286,7 @@ export default function MoonshotFinder() {
               {moonshotSequenceQuery.data?.prediction && (
                 <div className={cn(
                   "rounded-md border px-3 py-2.5",
-                  moonshotSequenceQuery.data.prediction.predicted && moonshotSequenceQuery.data.prediction.confidence > 0.7 
+                  moonshotSequenceQuery.data.prediction.predicted && (Number(moonshotSequenceQuery.data.prediction.confidence) || 0) > 0.7 
                     ? "border-violet/40 bg-violet/10" 
                     : "border-border/40 bg-muted/15"
                 )}>
@@ -308,26 +308,26 @@ export default function MoonshotFinder() {
                           <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
                             <div 
                               className="h-full rounded-full bg-violet transition-all"
-                              style={{ width: `${(moonshotSequenceQuery.data.prediction.confidence || 0) * 100}%` }}
+                              style={{ width: `${(Number(moonshotSequenceQuery.data.prediction.confidence) || 0) * 100}%` }}
                             />
                           </div>
-                          <span className="font-mono text-[10px] tabular-nums">{percent(moonshotSequenceQuery.data.prediction.confidence || 0)}</span>
+                          <span className="font-mono text-[10px] tabular-nums">{percent(Number(moonshotSequenceQuery.data.prediction.confidence) || 0)}</span>
                         </div>
                       </div>
                       
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <div className="text-[10px] text-muted-foreground mb-0.5">Predicted</div>
-                          <div className="font-mono text-xs font-semibold text-violet">{multiplier(moonshotSequenceQuery.data.prediction.predicted_multiplier || 0)}x</div>
+                          <div className="font-mono text-xs font-semibold text-violet">{multiplier(Number(moonshotSequenceQuery.data.prediction.predicted_multiplier) || 0)}x</div>
                         </div>
                         <div>
                           <div className="text-[10px] text-muted-foreground mb-0.5">ETA Rounds</div>
-                          <div className="font-mono text-xs font-semibold">{integer(moonshotSequenceQuery.data.prediction.estimated_rounds_until || 0)}</div>
+                          <div className="font-mono text-xs font-semibold">{integer(Number(moonshotSequenceQuery.data.prediction.estimated_rounds_until) || 0)}</div>
                         </div>
                       </div>
                       
                       <div className="text-[10px] text-muted-foreground">
-                        Based on {integer(moonshotSequenceQuery.data.prediction.similar_sequences_count || 0)} similar sequences · {moonshotSequenceQuery.data.prediction.reason}
+                        Based on {integer(Number(moonshotSequenceQuery.data.prediction.similar_sequences_count) || 0)} similar sequences · {moonshotSequenceQuery.data.prediction.reason}
                       </div>
                     </div>
                   ) : (

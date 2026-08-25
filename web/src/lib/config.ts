@@ -51,10 +51,11 @@ export const API_PREFIX = "/api/v1" as const;
 
 /** Poll intervals (ms). WebSocket is primary; polling is the safety net. */
 export const POLL = {
-  analysis: 4000,
-  rounds: 6000,
+  analysis: 2000,  // Faster for real-time prediction updates
+  rounds: 3000,   // Faster for live round updates
   health: 15000,
   slow: 30000,
+  realtime: 1000, // New ultra-fast interval for critical predictions
 } as const;
 
 export const STORAGE_KEYS = {

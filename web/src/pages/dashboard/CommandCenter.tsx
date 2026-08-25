@@ -46,20 +46,20 @@ export default function CommandCenter() {
     queryKey: ["command-center-rounds", source],
     queryFn: () => api.rounds(source, 80, 0, "desc", "file"),
     refetchInterval: POLL.rounds,
-    staleTime: 1500,
+    staleTime: 1000, // Reduced stale time for faster updates
   });
 
   const megaplanQuery = useQuery({
     queryKey: ["megaplan-prediction", source],
     queryFn: () => api.megaplanPrediction(source, 250, true),
-    refetchInterval: POLL.analysis,
+    refetchInterval: POLL.realtime, // Ultra-fast for real-time predictions
     enabled: !!source,
   });
 
   const moonshotSequenceQuery = useQuery({
     queryKey: ["moonshot-sequence", source],
     queryFn: () => api.moonshotSequence(source, 1.0, "file"),
-    refetchInterval: POLL.analysis * 3,
+    refetchInterval: POLL.analysis, // Faster than before
     enabled: !!source,
   });
 
@@ -86,11 +86,57 @@ export default function CommandCenter() {
     megaplanQuery.data?.consensus_score ?? 0
   );
 
-  // Enhanced moonshot probability with megaplan
+  // Enhanced moonshot probability with megaplan and sequence prediction with NaN protection
+  const sequencePredictionConfidence = Number(moonshotSequenceQuery.data?.prediction?.confidence) || 0;
   const enhancedMoonshotProbability = Math.max(
-    analysis?.prediction_confidence.moonshot_probability ?? 0,
-    megaplanQuery.data?.consensus_score ?? 0
+    Number(analysis?.prediction_confidence.moonshot_probability) || 0,
+    Number(megaplanQuery.data?.consensus_score) || 0,
+    sequencePredictionConfidence
   );
+
+  // Comprehensive forecast prediction integration with NaN protection
+  const forecastPredictionReady = 
+    blendedConfidence > 0.5 || 
+    (Number(megaplanQuery.data?.consensus_score) || 0) > 0.6 ||
+    sequencePredictionConfidence > 0.6;
+
+  // Calculate unified prediction target from all factors with NaN protection
+  const unifiedPredictionTarget = (() => {
+    const targets = [];
+    
+    // Traditional analysis forecast
+    if (analysis?.forecast?.candidates?.[0]) {
+      const candidate = analysis.forecast.candidates[0];
+      const value = Number(candidate.band || candidate.multiplier);
+      if (!isNaN(value) && value > 0) {
+        targets.push(value);
+      }
+    }
+    
+    // Megaplan prediction
+    if (megaplanQuery.data?.next_range_targets?.max) {
+      const value = Number(megaplanQuery.data.next_range_targets.max);
+      if (!isNaN(value) && value > 0) {
+        targets.push(value);
+      }
+    }
+    
+    // Moonshot sequence prediction
+    if (moonshotSequenceQuery.data?.prediction?.predicted_multiplier) {
+      const value = Number(moonshotSequenceQuery.data.prediction.predicted_multiplier);
+      if (!isNaN(value) && value > 0) {
+        targets.push(value);
+      }
+    }
+    
+    // Return highest target or fallback with NaN protection
+    if (targets.length > 0) {
+      const maxTarget = Math.max(...targets);
+      return isNaN(maxTarget) ? (Number(analysis?.latest?.multiplier) || 1.0) : maxTarget;
+    }
+    
+    return Number(analysis?.latest?.multiplier) || 1.0;
+  })();
 
   return (
     <AppShell
@@ -142,8 +188,8 @@ export default function CommandCenter() {
               progress={enhancedMoonshotProbability}
               hint={
                 analysis?.band_exhaustion?.most_overdue
-                  ? `${analysis.band_exhaustion.most_overdue.label} ${decimal(analysis.band_exhaustion.most_overdue.overdue_ratio, 2)}x cadence · megaplan ${percent(megaplanQuery.data?.consensus_score || 0)}`
-                  : `cadence warming up · megaplan ${percent(megaplanQuery.data?.consensus_score || 0)}`
+                  ? `${analysis.band_exhaustion.most_overdue.label} ${decimal(analysis.band_exhaustion.most_overdue.overdue_ratio, 2)}x cadence · megaplan ${percent(megaplanQuery.data?.consensus_score || 0)} · sequence ${percent(sequencePredictionConfidence)}`
+                  : `cadence warming up · megaplan ${percent(megaplanQuery.data?.consensus_score || 0)} · sequence ${percent(sequencePredictionConfidence)}`
               }
               icon={<Rocket className="h-3.5 w-3.5" />}
             />
@@ -411,13 +457,20 @@ export default function CommandCenter() {
                       variant="ghost"
                       className="h-7 gap-1.5 px-2 text-[11px]"
                       onClick={() => recordForecast.mutate()}
-                      disabled={recordForecast.isPending || !analysis?.forecast}
+                      disabled={recordForecast.isPending || !forecastPredictionReady}
                     >
                       <Save className="h-3 w-3" />
                       Record
                     </Button>
                   ) : undefined
                 }
+                unifiedTarget={unifiedPredictionTarget}
+                forecastReady={forecastPredictionReady}
+                factorContributions={{
+                  traditional: confidence,
+                  megaplan: megaplanQuery.data?.consensus_score ?? 0,
+                  sequence: sequencePredictionConfidence
+                }}
               />
 
               <div className="grid gap-4 md:grid-cols-2">
