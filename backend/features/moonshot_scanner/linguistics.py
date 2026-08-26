@@ -145,24 +145,29 @@ class MoonshotLinguistics:
             # Expected rounds (average gap)
             expected_rounds = statistics.mean(gaps) if gaps else None
             
-            # Calculate hold probability - how often does prediction hold for 1-3 rounds?
-            hold_count = 0
-            total_opportunities = 0
+            # Calculate hold probability: P(hit within 3 rounds | close round occurred).
+            # The previous logic was tautological — it checked whether close
+            # rounds existed before *known hits*, which always returns ~1.0
+            # when close rounds cluster near hits by construction.
+            # The correct formulation conditions on every close round and
+            # asks what fraction led to a hit within the next 3 rounds.
+            close_round_indices = [
+                i for i, r in enumerate(rounds)
+                if r["multiplier"] >= target * 0.8
+            ]
             
-            for idx in hit_indices[:-1]:  # Exclude last hit (no future data)
-                # Check if there were "near misses" in the 3 rounds before hit
-                window_start = max(0, idx - 3)
-                pre_hit_rounds = rounds[window_start:idx]
-                
-                # Count how many were close (within 20% of target)
-                close_rounds = sum(1 for r in pre_hit_rounds if r["multiplier"] >= target * 0.8)
-                
-                if close_rounds > 0:
-                    total_opportunities += 1
-                    # If it held through close rounds to actual hit, count as hold
+            hold_count = 0
+            for ci in close_round_indices:
+                # Check if a hit (>= target) occurs in the next 3 rounds
+                future_window = rounds[ci + 1: ci + 4]
+                if any(r["multiplier"] >= target for r in future_window):
                     hold_count += 1
             
-            hold_probability = hold_count / total_opportunities if total_opportunities > 0 else 0.5
+            hold_probability = (
+                hold_count / len(close_round_indices)
+                if close_round_indices
+                else 0.0
+            )
             
             # Confidence based on data quantity
             confidence = min(1.0, len(hit_indices) / 20.0)
@@ -291,11 +296,18 @@ class MoonshotLinguistics:
         }
     
     def _is_upward_move(self, transition: Dict[str, Any]) -> bool:
-        """Check if transition is upward (low -> ignition -> moonshot)."""
-        band_order = {"low": 0, "ignition": 1, "moonshot": 2, "mega": 3}
+        """Check if transition is upward in the full band hierarchy."""
+        # Build complete band order from the canonical BANDS list (all 10 bands,
+        # not just the 4 hardcoded previously: dust/floor/low/base/mid/high/
+        # ignition/moonshot/mega/cosmic).
+        from momento.linguistics import BANDS as _CANON_BANDS
+        band_order = {b["key"]: i for i, b in enumerate(_CANON_BANDS)}
+
         from_band = transition.get("from", "low")
         to_band = transition.get("to", "low")
-        return band_order.get(to_band, 0) > band_order.get(from_band, 0)
+        from_idx = band_order.get(from_band, 0)
+        to_idx = band_order.get(to_band, 0)
+        return to_idx > from_idx
     
     def compute_compression(
         self,

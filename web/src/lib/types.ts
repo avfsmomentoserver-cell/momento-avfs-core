@@ -244,6 +244,7 @@ export interface ForecastResult {
   confidence_label?: "HIGH" | "MEDIUM" | "LOW";
   range_lo: number;
   range_hi: number;
+  range_mode?: string;
   horizon: number;
   candidates: PredictionCandidate[];
   transition_matrix?: Record<string, Record<string, number>>;
@@ -994,6 +995,10 @@ export interface MoonshotSequencePrediction {
   predicted: boolean;
   confidence: number;
   predicted_multiplier?: number;
+  predicted_range?: { lo: number; hi: number };
+  historical_target?: number;
+  peaks_used?: number;
+  basis?: string;
   estimated_rounds_until?: number;
   similar_sequences_count?: number;
   weighted_growth_rate?: number;

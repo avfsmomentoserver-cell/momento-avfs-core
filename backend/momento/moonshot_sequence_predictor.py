@@ -1,10 +1,14 @@
 """Moonshot sequence prediction based on filtering rounds in sessions.
 
 This module implements prediction based on moonshot sequences deduced by filtering
-rounds in sessions, scaled to 10x+ to ensure all moonshots are known in sequence.
+rounds in sessions with a 10x+ reference threshold. The threshold is only used to
+select which historical rounds count as moonshots; it is not a floor on the
+predicted multiplier, which is derived from the historical sequence distribution.
 """
 
 import logging
+import math
+import statistics
 from typing import Any, Dict, List, Sequence, Tuple
 from datetime import datetime
 from . import config as cfg
@@ -19,7 +23,9 @@ class MoonshotSequencePredictor:
         self.settings = settings
         # Base moonshot threshold (configurable, default 10x)
         self.base_threshold = settings.moonshot_threshold
-        # Extended threshold for comprehensive filtering (10x+)
+        # Reference threshold for filtering historical moonshot rounds (10x+).
+        # Used only to select which rounds qualify as moonshots — it is not a
+        # floor on the predicted multiplier (that comes from the sequence data).
         self.extended_threshold = max(10.0, self.base_threshold)
         # Scaling factor for filtering rounds (relative to base threshold)
         self.filtering_scale = 1.0  # 1.0 means use base_threshold, 10.0 would be 10x base
@@ -55,22 +61,24 @@ class MoonshotSequencePredictor:
         scale_factor: float = 1.0
     ) -> List[Dict[str, Any]]:
         """Deduce moonshot sequences from filtered session rounds.
-        
+
         Args:
             sessions: List of sessions, each containing rounds
-            scale_factor: Threshold multiplier (default 1.0 = 10x threshold)
-                         scale_factor=1.0 gives 10x threshold, scale_factor=0.5 gives 5x threshold
-                         Lower values = more comprehensive (include lower multipliers)
-            
+            scale_factor: Threshold multiplier for the filtering reference
+                (default 1.0 = 10x). scale_factor=1.0 gives a 10x reference,
+                scale_factor=0.5 gives a 5x reference. Lower values are more
+                comprehensive (include lower multipliers).
+
         Returns:
             List of deduced moonshot sequences with metadata
         """
         sequences = []
         
         for session_idx, session in enumerate(sessions):
-            # Calculate threshold: base_threshold (10x) multiplied by scale_factor
-            # scale_factor=1.0 gives 10x threshold, scale_factor=0.5 gives 5x threshold
-            # For "10x+" comprehensiveness, we use scale_factor=1.0 (10x threshold)
+            # Reference threshold for filtering historical moonshots:
+            # base_threshold (10x) multiplied by scale_factor, floored at 10x.
+            # This only selects which rounds count as moonshots — it is never
+            # used as a floor on the predicted multiplier.
             scaled_threshold = self.base_threshold * scale_factor
             
             # Ensure minimum threshold of at least 10x for moonshot classification
@@ -132,7 +140,6 @@ class MoonshotSequencePredictor:
         # Calculate volatility (standard deviation of growth rates)
         volatility = 0.0
         if growth_rates:
-            import statistics
             try:
                 volatility = statistics.stdev(growth_rates) if len(growth_rates) > 1 else 0.0
             except statistics.StatisticsError:
@@ -238,19 +245,36 @@ class MoonshotSequencePredictor:
         # Simple bias-based prediction: use bias as main indicator
         # Higher bias score = higher moonshot probability
         if bias_score > 0.5:
-            # Calculate predicted multiplier based on bias
-            growth_factor = 1.0 + (bias_score * 0.5)  # Up to 1.5x growth
-            predicted_multiplier = current_last * growth_factor
-            predicted_multiplier = max(self.extended_threshold, predicted_multiplier)
-            
+            # Historical-distribution target: lean on the realized peak
+            # distribution of logged sequences, tilting toward the best peak
+            # by how strongly the bias exceeds the prediction gate.
+            peaks = sorted(float(s["peak_multiplier"]) for s in sequences)
+            historical_target = statistics.median(peaks)
+            bias_tilt = min(1.0, (bias_score - 0.5) * 2.0)          # 0 at gate, 1.0 max
+            predicted_multiplier = historical_target + bias_tilt * (max(peaks) - historical_target)
+            if current_last > historical_target:
+                predicted_multiplier = max(
+                    predicted_multiplier,
+                    min(max(peaks), current_last * (1.0 + bias_score * 0.5)),
+                )
+            predicted_multiplier = round(max(1.0, predicted_multiplier), 2)
+
             return {
                 "predicted": True,
                 "confidence": round(bias_score, 4),
-                "predicted_multiplier": round(predicted_multiplier, 2),
+                "predicted_multiplier": predicted_multiplier,
+                "predicted_range": {
+                    "lo": round(max(1.0, self.base_threshold), 2),
+                    "hi": predicted_multiplier,
+                },
                 "weighted_growth_rate": round(bias_score, 4),  # Use bias as growth rate
                 "current_multiplier": round(current_last, 2),
                 "threshold_used": self.extended_threshold,
                 "scale_factor": self.filtering_scale,
+                "historical_target": round(historical_target, 2),
+                "peaks_used": len(peaks),
+                "basis": f"median of {len(peaks)} historical sequence peaks "
+                         f"({min(peaks):.1f}x-{max(peaks):.1f}x) tilted by bias {bias_score:.2f}",
                 "reason": f"Bias-based prediction (score: {bias_score:.2f})"
             }
         else:
@@ -280,30 +304,42 @@ class MoonshotSequencePredictor:
         """
         current_multipliers = [r["multiplier"] for r in current_session]
         current_avg = sum(current_multipliers) / len(current_multipliers) if current_multipliers else 0.0
-        
-        # Calculate bias from historical sequence patterns
+
+        # Calculate bias from historical sequence patterns using log-ratio
+        # growth for symmetry.  The old formula (growth_rate + 1) / 2
+        # asymmetrically clamped: upward moves hit the ceiling at 1.0 while
+        # downward moves produced low bias near 0.  Log-ratios are symmetric
+        # (log(2) ≈ +0.69, log(0.5) ≈ −0.69), and the sigmoid maps them
+        # smoothly into [0, 1] with 0.5 at no-growth.
         sequence_biases = []
         for seq in sequences:
-            # Calculate bias from sequence growth rate
-            growth_rate = seq["sequence_growth"]["growth_rate"]
-            # Normalize growth rate to bias score (assuming growth rate range -1 to 1)
-            bias = (growth_rate + 1) / 2  # Convert to 0-1 range
-            bias = max(0.0, min(1.0, bias))
-            sequence_biases.append(bias)
-        
+            multipliers = seq.get("multipliers", [])
+            if len(multipliers) >= 2:
+                log_growth_rates = []
+                for i in range(1, len(multipliers)):
+                    if multipliers[i - 1] > 0:
+                        log_growth_rates.append(
+                            math.log(multipliers[i] / multipliers[i - 1])
+                        )
+                if log_growth_rates:
+                    avg_log_growth = sum(log_growth_rates) / len(log_growth_rates)
+                    # Sigmoid transform: log_growth=0 → 0.5, +1 → 0.73, −1 → 0.27
+                    bias = 1.0 / (1.0 + math.exp(-avg_log_growth))
+                    sequence_biases.append(bias)
+
         if not sequence_biases:
-            return 0.0
-        
+            return 0.5  # Neutral prior when no historical data
+
         # Average bias from historical sequences
         avg_historical_bias = sum(sequence_biases) / len(sequence_biases)
-        
+
         # Calculate current session bias from multipliers
         # Higher multipliers = higher bias
-        current_bias = min(1.0, current_avg / 20.0)  # Normalize against 20x
-        
+        current_bias = min(1.0, current_avg / 20.0) if current_avg > 0 else 0.5
+
         # Blend historical and current bias
         final_bias = (avg_historical_bias * 0.6) + (current_bias * 0.4)
-        
+
         return round(final_bias, 4)
 
 

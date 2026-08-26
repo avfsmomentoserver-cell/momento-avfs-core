@@ -10,7 +10,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { POLL } from "@/lib/config";
-import { decimal, multiplier, multiplierColor, percent } from "@/lib/format";
+import { clamp01, decimal, multiplier, multiplierColor, percent } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/state/AuthProvider";
 import { usePlatform } from "@/state/PlatformProvider";
@@ -43,8 +43,8 @@ export default function Today() {
   const plan = orchestratorQuery.data;
   const state = analysis?.state ?? "Idle";
   const mood = MOOD[state] ?? MOOD.Normal;
-  const confidence = analysis?.prediction_confidence.confidence ?? 0;
-  const ripeness = analysis?.prediction_confidence.moonshot_probability ?? 0;
+  const confidence = clamp01(analysis?.prediction_confidence.confidence);
+  const ripeness = clamp01(analysis?.prediction_confidence.moonshot_probability);
   const recent = [...rounds].reverse().slice(-40).map((round) => round.multiplier);
 
   const suggestedTarget = plan?.instruction.target_multiplier ?? analysis?.forecast?.range_lo ?? 0;

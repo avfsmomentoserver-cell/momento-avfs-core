@@ -25,7 +25,7 @@ import { CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { POLL } from "@/lib/config";
-import { decimal, integer, multiplier, percent } from "@/lib/format";
+import { clamp01, decimal, integer, multiplier, percent } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/state/AuthProvider";
 import { usePlatform } from "@/state/PlatformProvider";
@@ -81,17 +81,21 @@ export default function CommandCenter() {
   const resistance = analysis?.signals.upper_resistance;
 
   // Blend traditional confidence with megaplan consensus
-  const blendedConfidence = Math.max(
-    confidence,
-    megaplanQuery.data?.consensus_score ?? 0
+  const blendedConfidence = clamp01(
+    Math.max(
+      confidence,
+      megaplanQuery.data?.consensus_score ?? 0
+    )
   );
 
   // Enhanced moonshot probability with megaplan and sequence prediction with NaN protection
   const sequencePredictionConfidence = Number(moonshotSequenceQuery.data?.prediction?.confidence) || 0;
-  const enhancedMoonshotProbability = Math.max(
-    Number(analysis?.prediction_confidence.moonshot_probability) || 0,
-    Number(megaplanQuery.data?.consensus_score) || 0,
-    sequencePredictionConfidence
+  const enhancedMoonshotProbability = clamp01(
+    Math.max(
+      Number(analysis?.prediction_confidence.moonshot_probability) || 0,
+      Number(megaplanQuery.data?.consensus_score) || 0,
+      sequencePredictionConfidence
+    )
   );
 
   // Comprehensive forecast prediction integration with NaN protection
@@ -107,7 +111,7 @@ export default function CommandCenter() {
     // Traditional analysis forecast
     if (analysis?.forecast?.candidates?.[0]) {
       const candidate = analysis.forecast.candidates[0];
-      const value = Number(candidate.band || candidate.multiplier);
+      const value = Number(candidate.breakout_target ?? candidate.range_hi ?? 0);
       if (!isNaN(value) && value > 0) {
         targets.push(value);
       }
@@ -423,7 +427,7 @@ export default function CommandCenter() {
                           (megaplanQuery.data.next_range_targets?.confidence || 0) > 0.4 && "text-info",
                           (megaplanQuery.data.next_range_targets?.confidence || 0) <= 0.4 && "text-muted-foreground"
                         )}>
-                          {multiplier(megaplanQuery.data.next_range_targets?.max || 10)}x
+                          {multiplier(megaplanQuery.data.next_range_targets?.max)}x
                         </div>
                       </div>
                     </div>

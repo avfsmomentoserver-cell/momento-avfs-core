@@ -98,31 +98,53 @@ class CeilingDetector:
         multipliers: List[float],
         maxima_indices: List[int]
     ) -> Dict[float, List[int]]:
-        """Cluster nearby maxima into ceiling levels.
-        
+        """Cluster nearby maxima into ceiling levels with running-mean centers.
+
+        The previous implementation pinned each cluster to its *first* maxima
+        value, making the result order-dependent: two maxima that are each
+        within tolerance of the cluster center but far from each other would
+        still merge, while a maxima that is close to the running mean but not
+        the first value could be missed.
+
+        Fix: after each addition, recompute the cluster center as the mean of
+        all member values and re-key the dictionary.  This produces stable,
+        order-independent clusters.
+
         Args:
             multipliers: List of multiplier values
             maxima_indices: Indices of local maxima
-            
+
         Returns:
             Dictionary mapping ceiling level to list of indices
         """
         clusters: Dict[float, List[int]] = {}
-        
+
         for idx in maxima_indices:
             value = multipliers[idx]
-            
-            # Find existing cluster within tolerance
-            found_cluster = False
-            for level in clusters.keys():
-                if abs(value - level) <= self.tolerance * level:
-                    clusters[level].append(idx)
-                    found_cluster = True
-                    break
-            
-            if not found_cluster:
+
+            # Find the closest existing cluster within tolerance
+            found_key: float | None = None
+            found_distance = float("inf")
+            for level in list(clusters.keys()):
+                dist = abs(value - level)
+                if dist <= self.tolerance * level and dist < found_distance:
+                    found_key = level
+                    found_distance = dist
+
+            if found_key is not None:
+                clusters[found_key].append(idx)
+
+                # Recompute center as the mean of all member values
+                cluster_values = [multipliers[i] for i in clusters[found_key]]
+                new_center = sum(cluster_values) / len(cluster_values)
+
+                # Re-key the dictionary to the updated center
+                if abs(new_center - found_key) > 1e-12:
+                    cluster_indices = clusters.pop(found_key)
+                    clusters[new_center] = cluster_indices
+            else:
                 clusters[value] = [idx]
-        
+
         return clusters
     
     def _classify_ceiling_archetype(

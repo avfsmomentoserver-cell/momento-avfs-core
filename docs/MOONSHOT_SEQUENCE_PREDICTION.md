@@ -17,11 +17,19 @@ The Moonshot Sequence Prediction system adds prediction capabilities based on mo
 - Tracks time spans and rounds between moonshot events
 - Identifies peak multipliers and average session characteristics
 
-### 3. Prediction Logic
-- Finds similar historical sequences based on session characteristics
-- Aggregates predictions from multiple similar sequences
-- Estimates next moonshot multiplier and timing
-- Provides confidence scores based on similarity and data quality
+### 3. Prediction Logic (bias-based, historical-distribution target)
+- Computes a **bias score** (0-1) from historical sequence log-ratio growth rates
+  (sigmoid-mapped: log(2) ≈ 0.69 → bias 0.67, log(0.5) → 0.33; 0.5 at no-growth)
+  blended with the current session's average multiplier (60% historical / 40% current).
+- When `bias_score > 0.5`: targets the **median of historical sequence peak multipliers**,
+  tilted toward the maximum peak by `bias_tilt = min(1.0, (bias_score - 0.5) * 2)`.
+  If the current session's last round already exceeds the median, the target extends
+  up to `min(max_peak, current_last * (1 + bias_score * 0.5))`.
+- The predicted multiplier is data-driven (varies per market) — it is NOT floored at 10x.
+  The 10x reference threshold only selects which rounds count as moonshots.
+- Returns `predicted_range {lo, hi}`, `historical_target` (median peak), `peaks_used`,
+  and a `basis` string describing the derivation.
+- When `bias_score ≤ 0.5`: returns `predicted: false` with reason.
 
 ### 4. 10x+ Scaling
 - Default threshold of 10x ensures all significant moonshots are captured
@@ -63,7 +71,7 @@ GET /api/analysis/moonshot-sequence?source={source}&scale_factor=1.0
 
 Parameters:
 - `source`: Data source to analyze
-- `scale_factor`: Threshold multiplier (default 1.0 = 10x, 0.5 = 5x)
+- `scale_factor`: Threshold multiplier (default 1.0 = 10x; lower values still floor at 10x)
 - `ingest_method`: Optional filter for data ingestion method
 
 ### Response Structure
@@ -99,9 +107,15 @@ Parameters:
     "predicted": true,
     "confidence": 0.75,
     "predicted_multiplier": 28.5,
-    "estimated_rounds_until": 7,
-    "similar_sequences_count": 3,
-    "weighted_growth_rate": 0.32
+    "predicted_range": { "lo": 10.0, "hi": 28.5 },
+    "weighted_growth_rate": 0.75,
+    "current_multiplier": 2.1,
+    "threshold_used": 10.0,
+    "scale_factor": 1.0,
+    "historical_target": 22.0,
+    "peaks_used": 4,
+    "basis": "median of 4 historical sequence peaks (12.0x-40.0x) tilted by bias 0.75",
+    "reason": "Bias-based prediction (score: 0.75)"
   },
   "filtering_threshold": 10.0,
   "scale_factor": 1.0
@@ -119,10 +133,9 @@ The system uses existing `AnalysisSettings` from `config.py`:
 
 ### Scale Factor Interpretation
 
-- `1.0`: Base threshold (10x) - standard moonshot detection
-- `0.5`: 5x threshold - more comprehensive, includes lower multipliers
-- `0.1`: 1x threshold - maximum comprehensiveness
-- Higher values: Less comprehensive, only very high multipliers
+- `1.0`: Reference threshold (10x) — standard moonshot detection.
+- Lower values (`0.5`, `0.1`): **filter floor remains at 10x** (`scaled_threshold = max(base_threshold * scale_factor, 10.0)`); the floor does not lower below 10x regardless of scale_factor.
+- `threshold_used` in the payload is the reference filter for what counts as a moonshot event; it is **not** a floor on the predicted multiplier.
 
 ## Testing
 
@@ -147,20 +160,31 @@ python3 -m pytest tests/test_moonshot_sequence_predictor.py -v
 
 ## Algorithm Details
 
-### Sequence Similarity
+### Bias Calculation (current, v4)
 
-Similarity between sequences is calculated based on:
-1. Average multiplier difference (60% weight)
-2. Peak multiplier difference (40% weight)
+Bias is computed from the **log-ratio growth** of each historical sequence's
+multipliers (symmetric: `log(2) ≈ +0.69`, `log(0.5) ≈ −0.69`). The average
+log-growth is passed through a sigmoid into `[0, 1]` (0.5 at zero growth),
+averaged across sequences, and blended 60% historical / 40% current-session
+(where `current_bias = min(1.0, current_avg / 20.0)`).
 
-Similarity score ranges from 0 to 1, where lower values indicate higher similarity.
+### Predicted Multiplier (historical-distribution target)
 
-### Prediction Aggregation
+When `bias_score > 0.5`:
+- `historical_target = median(sequence peak multipliers)`.
+- `bias_tilt = min(1.0, (bias_score − 0.5) * 2)` (0 at gate, 1 at full tilt).
+- `predicted_multiplier = historical_target + bias_tilt * (max_peak − historical_target)`.
+- If the current session's last round exceeds `historical_target`, the prediction
+  extends up to `min(max_peak, current_last * (1 + bias_score * 0.5))`.
 
-Predictions are aggregated from similar sequences using:
-- Weighted average based on similarity scores
-- Growth rate extrapolation from historical patterns
-- Confidence calculation combining similarity and sequence count
+No hard floor on `predicted_multiplier` — the 10x reference only selects which
+rounds seed the sequences.
+
+### Legacy similarity approach
+
+Earlier revisions aggregated predictions via sequence similarity (avg multiplier
+diff 60%, peak diff 40%). Replaced by the bias-based approach for predictability
+and measurability.
 
 ### Growth Calculation
 

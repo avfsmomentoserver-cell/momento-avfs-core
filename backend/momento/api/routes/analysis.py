@@ -6,7 +6,7 @@ from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, Query
 
-from ... import analysis as engine
+from ... import analysis
 from ... import forecast as forecast_engine
 from ... import linguistics as ling
 from ... import plugins, store
@@ -67,11 +67,11 @@ async def resistance(
     multipliers = [float(r["multiplier"]) for r in rounds]
     return {
         "source": source,
-        "resistance": engine.resistance_levels(multipliers, settings),
-        "collapse_ladder": engine.collapse_ladder(multipliers, settings),
-        "ascending_ladder": engine.ascending_ladder(multipliers, settings),
-        "nested": engine.nested_bands(multipliers, settings),
-        "shelf": engine.shelf_signal(multipliers, settings),
+        "resistance": analysis.resistance_levels(multipliers, settings),
+        "collapse_ladder": analysis.collapse_ladder(multipliers, settings),
+        "ascending_ladder": analysis.ascending_ladder(multipliers, settings),
+        "nested": analysis.nested_bands(multipliers, settings),
+        "shelf": analysis.shelf_signal(multipliers, settings),
     }
 
 
@@ -98,7 +98,7 @@ async def gap_swing_analyzer(
     rounds = store.history(source, 600, ingest_method=ingest_method)
     multipliers = [float(r["multiplier"]) for r in rounds]
     result = plugins.gap_swing_analyzer(multipliers, settings, {"weight": 1.0, "threshold": 0.4})
-    return {"source": source, "analyzer": "gap_swing", "detail_series": engine.gap_swing(multipliers), **result}
+    return {"source": source, "analyzer": "gap_swing", "detail_series": analysis.gap_swing(multipliers), **result}
 
 
 @router.get("/analysis/dna")
@@ -119,7 +119,7 @@ async def dna(
     multipliers = [float(r["multiplier"]) for r in rounds]
     return {
         "source": source,
-        "report": engine.dna_report(multipliers, settings),
+        "report": analysis.dna_report(multipliers, settings),
         "settings": {"tolerance": settings.dna_tolerance, "window": settings.dna_window},
         "samples": len(multipliers),
     }
@@ -133,7 +133,7 @@ async def house_edge(
     settings = store.analysis_settings()
     rounds = store.history(source, settings.max_rounds_buffer, ingest_method=ingest_method)
     multipliers = [float(r["multiplier"]) for r in rounds]
-    return {"source": source, **engine.house_edge(multipliers, settings)}
+    return {"source": source, **analysis.house_edge(multipliers, settings)}
 
 
 @router.get("/analysis/moonshot")
@@ -146,10 +146,10 @@ async def moonshot(
     multipliers = [float(r["multiplier"]) for r in rounds]
     return {
         "source": source,
-        "eta": engine.moonshot_eta(rounds, settings),
-        "mega_scores": engine.mega_moonshot_scores(rounds, settings),
-        "band_exhaustion": engine.band_exhaustion(multipliers, settings),
-        "dna": engine.dna_report(multipliers, settings),
+        "eta": analysis.moonshot_eta(rounds, settings),
+        "mega_scores": analysis.mega_moonshot_scores(rounds, settings),
+        "band_exhaustion": analysis.band_exhaustion(multipliers, settings),
+        "dna": analysis.dna_report(multipliers, settings),
     }
 
 
@@ -214,7 +214,19 @@ async def ml(
     settings = store.analysis_settings()
     rounds = store.history(source, settings.max_rounds_buffer, ingest_method=ingest_method)
     multipliers = [float(r["multiplier"]) for r in rounds]
-    return {"source": source, **forecast_engine.ml_predictions(multipliers, settings)}
+    
+    # Get moonshot sequence analysis if available
+    moonshot_seq_analysis = {}
+    if analysis.MOONSHOT_SEQUENCE_PREDICTOR_AVAILABLE and len(rounds) >= 20:
+        try:
+            from ...moonshot_sequence_predictor import analyze_moonshot_sequences
+            moonshot_seq_analysis = analyze_moonshot_sequences(
+                rounds, settings, settings.session_gap_seconds, scale_factor=1.0
+            )
+        except Exception as e:
+            moonshot_seq_analysis = {"status": "error", "error": str(e)}
+    
+    return {"source": source, **forecast_engine.ml_predictions(multipliers, settings, moonshot_seq_analysis)}
 
 
 @router.get("/analysis/plugins")

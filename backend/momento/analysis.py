@@ -257,6 +257,11 @@ def collapse_ladder(multipliers: Sequence[float], settings: AnalysisSettings) ->
     if len(multipliers) < 2:
         return {"active": False, "run": 0, "ceiling": 0.0, "strength": 0.0, "breakout_pct": 0.0}
 
+    default_result: Dict[str, Any] = {
+        "active": False, "run": 0, "ceiling": 0.0, "ceiling_points": 0.0,
+        "strength": 0.0, "breakout_pct": 0.0,
+    }
+
     points = [ling.to_points(m) for m in multipliers]
     run = 1
     ceiling = points[-1]
@@ -266,6 +271,9 @@ def collapse_ladder(multipliers: Sequence[float], settings: AnalysisSettings) ->
             ceiling = max(ceiling, points[index])
         else:
             break
+
+    if ceiling <= points[-1]:
+        return default_result
 
     active = run >= settings.collapse_min_length
     strength = clamp(run / 10.0)
@@ -329,8 +337,15 @@ def find_release_conditions(
     # Analyze longest ladders for moonshot correlation
     release_conditions = []
     moonshot_correlations = 0
+    evaluated_ladders = 0
     
+    # C1 fix: only evaluate ladders that ended ≥15 rounds before the current
+    # position, so moonshot_probability is never derived from future data.
+    cutoff = len(multipliers) - 15
     for ladder in longest_ladders:
+        if ladder.end_index >= cutoff:
+            continue
+        evaluated_ladders += 1
         # Check if moonshot occurs within 15 rounds after ladder ends
         window_end = min(len(multipliers), ladder.end_index + 15)
         moonshot_in_window = any(i in moonshot_indices for i in range(ladder.end_index + 1, window_end))
@@ -358,8 +373,7 @@ def find_release_conditions(
                     "ladder_strength": ladder.strength
                 })
     
-    # Calculate correlation rate
-    correlation_rate = moonshot_correlations / len(longest_ladders) if longest_ladders else 0.0
+    correlation_rate = moonshot_correlations / max(1, evaluated_ladders)
     
     # Calculate moonshot probability based on current conditions
     current_ladders = [l for l in ladders if l.end_index == len(multipliers) - 1]
@@ -526,8 +540,13 @@ def bait_signal(multipliers: Sequence[float], settings: AnalysisSettings) -> Dic
     if len(window) < 5:
         return {"active": False, "strength": 0.0, "spike": 0.0, "context_mean": 0.0}
 
+    # H2 fix: remove only one occurrence of the max so that two rounds
+    # sharing the peak value don't both disappear, exaggerating bait ratio.
     spike = max(window)
-    others = [m for m in window if m != spike] or [1.0]
+    others = list(window)
+    others.remove(spike)  # Removes first occurrence only
+    if not others:
+        others = [1.0]
     context_mean = statistics.fmean(others)
     ratio = spike / max(1.0, context_mean)
     lows = sum(1 for m in others if m < settings.low_band_threshold)
@@ -553,11 +572,22 @@ def resistance_levels(multipliers: Sequence[float], settings: AnalysisSettings) 
         return {"levels": [], "recently_cleared": 0, "nearest": None, "pressure": 0.0}
 
     points = [ling.to_points(m) for m in multipliers]
-    peaks = [
-        points[i]
-        for i in range(1, len(points) - 1)
-        if points[i] >= points[i - 1] and points[i] >= points[i + 1]
-    ]
+    peaks: List[float] = []
+    i = 1
+    while i < len(points) - 1:
+        if points[i] > points[i - 1] and points[i] > points[i + 1]:
+            peaks.append(points[i])
+            i += 1
+        elif points[i] > points[i - 1] and points[i] == points[i + 1]:
+            plateau_start = i
+            while i < len(points) - 1 and points[i] == points[i + 1]:
+                i += 1
+            if i < len(points) and points[i] > points[i + 1]:
+                midpoint = (plateau_start + i) / 2.0
+                peaks.append(points[plateau_start])
+            i += 1
+        else:
+            i += 1
     if not peaks:
         peaks = [max(points)]
 
@@ -792,14 +822,28 @@ def dna_report(multipliers: Sequence[float], settings: AnalysisSettings) -> Dict
     target = [index_of[k] for k in signature]
 
     matches: List[Dict[str, Any]] = []
-    limit = len(multipliers) - window_size * 2
+    # C2 fix: ensure no candidate's follow-up window overlaps the current
+    # signature window being predicted.  The current window starts at
+    # current_start; any candidate whose follow_index >= current_start would
+    # leak information from the prediction target itself.
+    current_start = len(multipliers) - window_size
+    limit = current_start - window_size  # last start whose follow won't overlap
+    # C5 fix: use log-space L1 distance on actual multipliers so that
+    # dust→floor (0.2x) and moonshot→mega (30-50x) are not treated as equal.
+    # max per-position distance ≈ log2(100) ≈ 6.64.
+    max_log_distance = window_size * 6.64
+    target_mults = list(multipliers)[-window_size:]
     for start in range(max(0, limit)):
-        candidate = [index_of[k] for k in keys[start : start + window_size]]
-        distance = sum(abs(a - b) for a, b in zip(candidate, target))
-        similarity = 1.0 - (distance / (window_size * (len(ling.BAND_KEYS) - 1)))
+        candidate_mults = multipliers[start : start + window_size]
+        log_distance = sum(
+            abs(math.log2(max(1.0, a)) - math.log2(max(1.0, b)))
+            for a, b in zip(candidate_mults, target_mults)
+        )
+        similarity = max(0.0, 1.0 - (log_distance / max_log_distance))
         if similarity >= settings.dna_tolerance:
             follow_index = start + window_size
-            if follow_index < len(multipliers):
+            # C2: guard — follow must precede the current signature window
+            if follow_index < current_start:
                 matches.append(
                     {
                         "index": start,
@@ -811,20 +855,51 @@ def dna_report(multipliers: Sequence[float], settings: AnalysisSettings) -> Dict
                 )
 
     matches.sort(key=lambda m: m["similarity"], reverse=True)
-    followers = [m["next_multiplier"] for m in matches]
+
+    current_position = len(multipliers)
+    weighted_followers: List[Tuple[float, float]] = []
+    for match in matches:
+        age = current_position - match["index"]
+        recency = math.exp(-age / 200.0)
+        weight = match["similarity"] * recency
+        weighted_followers.append((match["next_multiplier"], weight))
 
     outcomes: Dict[str, Any] = {}
-    if followers:
-        outcomes = {
-            "count": len(followers),
-            "mean": _safe_mean(followers),
-            "median": percentile(followers, 50),
-            "p75": percentile(followers, 75),
-            "p90": percentile(followers, 90),
-            "over_2x": round(sum(1 for f in followers if f >= 2) / len(followers), 4),
-            "over_5x": round(sum(1 for f in followers if f >= 5) / len(followers), 4),
-            "over_10x": round(sum(1 for f in followers if f >= 10) / len(followers), 4),
-        }
+    if weighted_followers:
+        total_weight = sum(w for _, w in weighted_followers)
+        if total_weight > 0:
+            weighted_mean = sum(v * w for v, w in weighted_followers) / total_weight
+            weighted_values = sorted(
+                (v for v, _ in weighted_followers)
+            )
+            outcomes = {
+                "count": len(weighted_followers),
+                "mean": round(weighted_mean, 4),
+                "median": percentile(weighted_values, 50),
+                "p75": percentile(weighted_values, 75),
+                "p90": percentile(weighted_values, 90),
+                "over_2x": round(
+                    sum(w for v, w in weighted_followers if v >= 2) / total_weight, 4
+                ),
+                "over_5x": round(
+                    sum(w for v, w in weighted_followers if v >= 5) / total_weight, 4
+                ),
+                "over_10x": round(
+                    sum(w for v, w in weighted_followers if v >= 10) / total_weight, 4
+                ),
+            }
+        else:
+            raw_followers = [m["next_multiplier"] for m in matches]
+            outcomes = {
+                "count": len(raw_followers),
+                "mean": _safe_mean(raw_followers),
+                "median": percentile(raw_followers, 50),
+                "p75": percentile(raw_followers, 75),
+                "p90": percentile(raw_followers, 90),
+                "over_2x": round(sum(1 for f in raw_followers if f >= 2) / len(raw_followers), 4),
+                "over_5x": round(sum(1 for f in raw_followers if f >= 5) / len(raw_followers), 4),
+                "over_10x": round(sum(1 for f in raw_followers if f >= 10) / len(raw_followers), 4),
+            }
 
     return {
         "signature": signature,
@@ -1002,8 +1077,17 @@ def compute_calibration_metrics(confidences: List[float], outcomes: List[int]) -
     }
 
 
-def classify_state(signals: Dict[str, Any], multipliers: Sequence[float], settings: AnalysisSettings) -> Tuple[str, Dict[str, float]]:
-    """Score every state and return the winner plus the full score table."""
+def classify_state(
+    signals: Dict[str, Any],
+    multipliers: Sequence[float],
+    settings: AnalysisSettings,
+    current_state: str = "Normal",
+) -> Tuple[str, Dict[str, float]]:
+    """Score every state and return the winner plus the full score table.
+
+    ``current_state`` enables hysteresis (H8): the incumbent state keeps its
+    label unless a challenger exceeds it by at least ``HYSTERESIS_MARGIN``.
+    """
     if not multipliers:
         return "Normal", {state: 0.0 for state in ling.STATES}
 
@@ -1018,22 +1102,50 @@ def classify_state(signals: Dict[str, Any], multipliers: Sequence[float], settin
     bait = signals.get("bait", {})
     nested = signals.get("nested", {})
 
+    collapse_strength = float(col.get("strength", 0.0)) * (1.25 if col.get("active") else 0.5)
+    asc_strength = float(asc.get("strength", 0.0))
+    shelf_strength = float(shelf.get("strength", 0.0)) * (1.2 if shelf.get("active") else 0.4)
+    bait_strength = float(bait.get("strength", 0.0)) * (1.3 if bait.get("active") else 0.35)
+    compression = float(nested.get("compression", 0.0))
+    ignition_strength = (asc_strength * 0.7) + (compression * 0.55)
+    moonshot_base = clamp(high_hits / 2.5) if last >= settings.ignition_threshold else clamp(high_hits / 6.0)
+
+    # C8 fix: Normal baseline is inversely related to the strongest competing
+    # signal.  When other states show clear evidence, Normal should *lose* its
+    # free head-start; when nothing fires, Normal wins by default.
+    signal_strengths = [
+        collapse_strength,
+        asc_strength,
+        shelf_strength,
+        bait_strength,
+        compression,
+    ]
+    max_signal = max(signal_strengths) if signal_strengths else 0.0
+    normal_baseline = max(0.0, 0.5 - max_signal * 0.8)
+
     scores: Dict[str, float] = {
-        "Normal": 0.34,
-        "Collapse": float(col.get("strength", 0.0)) * (1.25 if col.get("active") else 0.5),
-        "Ignition": (float(asc.get("strength", 0.0)) * 0.7) + (float(nested.get("compression", 0.0)) * 0.55),
-        "Moonshot": clamp(high_hits / 2.5) if last >= settings.ignition_threshold else clamp(high_hits / 6.0),
+        "Normal": normal_baseline,
+        "Collapse": collapse_strength,
+        "Ignition": ignition_strength,
+        "Moonshot": moonshot_base,
         "Exhaustion": 0.0,
-        "Shelf": float(shelf.get("strength", 0.0)) * (1.2 if shelf.get("active") else 0.4),
-        "Bait": float(bait.get("strength", 0.0)) * (1.3 if bait.get("active") else 0.35),
+        "Shelf": shelf_strength,
+        "Bait": bait_strength,
     }
 
-    # Exhaustion: a big print already landed and the market is fading.
+    # C9 fix: gradual exhaustion based on drawdown from recent peak rather
+    # than a binary peak-then-crash gate.  drawdown captures how much energy
+    # was spent; proximity_to_peak captures how far the last print fell.
     peak_recent = max(recent)
+    recent_trough = min(recent)
+    drawdown = (peak_recent - recent_trough) / max(1.0, peak_recent)
+    proximity_to_peak = 1.0 - (last / max(1.01, peak_recent))
+    scores["Exhaustion"] = min(1.0, drawdown * 0.8 + proximity_to_peak * 0.4)
+
+    # Bonus when a moonshot-sized peak was followed by a retreat below the
+    # low band — strong evidence of post-spike energy depletion.
     if peak_recent >= settings.moonshot_threshold and last < settings.low_band_threshold:
-        scores["Exhaustion"] = clamp(0.55 + (low_hits / 14.0))
-    elif peak_recent >= settings.ignition_threshold and last < settings.low_band_threshold:
-        scores["Exhaustion"] = clamp(0.4 + (low_hits / 20.0))
+        scores["Exhaustion"] = min(1.0, scores["Exhaustion"] + 0.2)
 
     if last >= settings.moonshot_threshold:
         scores["Moonshot"] = clamp(scores["Moonshot"] + 0.45)
@@ -1044,6 +1156,15 @@ def classify_state(signals: Dict[str, Any], multipliers: Sequence[float], settin
 
     scores = {key: clamp(value) for key, value in scores.items()}
     winner = max(scores.items(), key=lambda item: item[1])[0]
+
+    # H8 fix: hysteresis — require the challenger to exceed the incumbent by
+    # at least HYSTERESIS_MARGIN before a state flip is accepted.  This
+    # prevents single-round noise from causing rapid state oscillation.
+    HYSTERESIS_MARGIN = 0.08
+    if winner != current_state and current_state in scores:
+        if scores[winner] - scores[current_state] < HYSTERESIS_MARGIN:
+            winner = current_state  # Stay in current state
+
     return winner, scores
 
 
@@ -1066,7 +1187,8 @@ def state_transitions(rounds: Sequence[Round], settings: AnalysisSettings) -> Li
             "bait": bait_signal(window, settings),
             "nested": nested_bands(window, settings),
         }
-        state, _ = classify_state(signals, window, settings)
+        # H8: pass the previous state so hysteresis prevents single-round flips
+        state, _ = classify_state(signals, window, settings, current_state=previous or "Normal")
         if state != previous:
             entry = rounds[end - 1]
             transitions.append(
@@ -1151,15 +1273,20 @@ def analyze(rounds: Sequence[Round], settings: AnalysisSettings, toggles: config
     trend = signals["gap_swing"]["direction"]
     signals["trend"] = trend
 
-    # Confidence blends sample size, regime clarity and signal agreement.
-    agreement = max(scores.values()) - statistics.fmean(sorted(scores.values())[:-1]) if len(scores) > 1 else 0.0
+    sorted_scores = sorted(scores.values())
+    max_score = sorted_scores[-1] if sorted_scores else 0.0
+    others = sorted_scores[:-1]
+    agreement = max_score - statistics.fmean(others) if others else 0.0
     sample_factor = clamp(len(multipliers) / 150.0)
     confidence = clamp(max(settings.confidence_floor, (agreement * 0.55) + (sample_factor * 0.3) + (float(reg["confidence"]) * 0.15)))
 
+    # H12 fix: ascending_ladder_strength already counted in state classification,
+    # candidate tilt, and confidence — reduce its moonshot_prob weight from 0.2 to
+    # 0.1 and redistribute to the primary 10x distribution signal.
     moonshot_prob = clamp(
-        (dist.get("10x", 0.0) * 0.5)
+        (dist.get("10x", 0.0) * 0.6)
         + (float(exhaustion.get("most_overdue", {}).get("exhaustion", 0.0)) if exhaustion.get("most_overdue") else 0.0) * 0.3
-        + (float(signals["ascending_ladder"]["strength"]) * 0.2)
+        + (float(signals["ascending_ladder"]["strength"]) * 0.1)
     )
     ignition_prob = clamp(
         (dist.get("5x", 0.0) * 0.45)
@@ -1224,11 +1351,17 @@ def analyze(rounds: Sequence[Round], settings: AnalysisSettings, toggles: config
                 from features.moonshot_scanner.exhaustion import ExhaustionCalculator
                 exhaustion_calc = ExhaustionCalculator()
                 
-                # Generate pressure history for exhaustion
+                # H3 fix: compute ceilings incrementally using only data up to
+                # position i, so the rolling pressure calculation never sees
+                # future ceilings that weren't known at that point in time.
                 pressure_history = []
                 for i in range(20, len(multipliers)):
                     window = [{"multiplier": m} for m in multipliers[i-20:i]]
-                    pressure_result = calculator.compute_pressure(window, ceilings)
+                    historical_data = [{"multiplier": m} for m in multipliers[:i]]
+                    window_ceilings = CeilingDetector(
+                        min_touches=3, tolerance=0.05
+                    ).detect_resistance_ceilings(historical_data)
+                    pressure_result = calculator.compute_pressure(window, window_ceilings)
                     pressure_history.append(pressure_result.get("pressure_percent", 0))
                 
                 combined_exhaustion = exhaustion_calc.compute_combined_exhaustion(
@@ -1394,6 +1527,8 @@ def session_phases(rounds: Sequence[Round], settings: AnalysisSettings) -> List[
     """Label each round with its live state — drives the ladder/phase charts."""
     multipliers = _multipliers(rounds)
     out: List[Dict[str, Any]] = []
+    # H8: track previous phase so hysteresis prevents single-round flips
+    previous_phase = "Normal"
 
     for index, entry in enumerate(rounds):
         window = multipliers[max(0, index - 39) : index + 1]
@@ -1411,7 +1546,8 @@ def session_phases(rounds: Sequence[Round], settings: AnalysisSettings) -> List[
                 "bait": bait_signal(window, settings),
                 "nested": nested_bands(window, settings),
             }
-            state, _ = classify_state(signals, window, settings)
+            state, _ = classify_state(signals, window, settings, current_state=previous_phase)
+        previous_phase = state
 
         multiplier = float(entry["multiplier"])
         out.append(

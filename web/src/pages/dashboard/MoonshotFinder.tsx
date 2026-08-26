@@ -8,7 +8,7 @@ import { StatTile } from "@/components/console/StatTile";
 import { AppShell } from "@/components/layout/AppShell";
 import { api } from "@/lib/api";
 import { POLL } from "@/lib/config";
-import { decimal, duration, integer, multiplier, percent } from "@/lib/format";
+import { clamp01, decimal, duration, integer, multiplier, percent } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { usePlatform } from "@/state/PlatformProvider";
 
@@ -85,16 +85,16 @@ export default function MoonshotFinder() {
               <StatTile
                 label="Moonshot probability"
                 value={percent(
-                  Math.max(
+                  clamp01(Math.max(
                     Number(analysis?.prediction_confidence.moonshot_probability) || 0,
                     Number(megaplanQuery.data?.consensus_score) || 0
-                  )
+                  ))
                 )}
                 accent="info"
-                progress={Math.max(
+                progress={clamp01(Math.max(
                   Number(analysis?.prediction_confidence.moonshot_probability) || 0,
                   Number(megaplanQuery.data?.consensus_score) || 0
-                )}
+                ))}
                 hint={`10x share ${percent(analysis?.distribution["10x"], 1)} · megaplan ${percent(Number(megaplanQuery.data?.consensus_score) || 0)}`}
               />
               <StatTile
@@ -204,7 +204,7 @@ export default function MoonshotFinder() {
                     (megaplanQuery.data?.next_range_targets?.confidence || 0) > 0.4 && "text-info",
                     (megaplanQuery.data?.next_range_targets?.confidence || 0) <= 0.4 && "text-muted-foreground"
                   )}>
-                    {multiplier(megaplanQuery.data?.next_range_targets?.max || 10)}x
+                    {multiplier(megaplanQuery.data?.next_range_targets?.max)}x
                   </div>
                 </div>
               </div>

@@ -42,7 +42,9 @@ def state_sequence(rounds: Sequence[Round], settings: AnalysisSettings) -> List[
             "bait": analysis.bait_signal(window, settings),
             "nested": analysis.nested_bands(window, settings),
         }
-        state, _ = analysis.classify_state(signals, window, settings)
+        # H8: pass the previous label so hysteresis prevents single-round flips
+        prior = labels[-1] if labels else "Normal"
+        state, _ = analysis.classify_state(signals, window, settings, current_state=prior)
         labels.append(state)
     return labels
 
@@ -161,14 +163,14 @@ def _band_range_for_state(state: str, percentiles: Dict[str, float], settings: A
         "Exhaustion": (1.0, max(1.2, p50)),
         "Bait": (1.0, max(1.3, p75)),
         "Ignition": (max(1.5, p75), max(settings.ignition_threshold, p95)),
-        "Moonshot": (max(settings.ignition_threshold, p90), max(settings.mega_moonshot_threshold, p95 * 3)),
+        "Moonshot": (max(settings.ignition_threshold, p90), max(settings.ignition_threshold, p95)),
     }
     lo, hi = table.get(state, (max(1.0, p25), max(1.2, p75)))
     return round(max(1.0, lo), 2), round(max(lo + 0.05, hi), 2)
 
 
 def candidates(rounds: Sequence[Round], settings: AnalysisSettings, analysis_payload: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
-    """Ranked prediction candidates for the next round with ladder-enhanced moonshot prediction."""
+    """Ranked prediction candidates for the next round."""
     multipliers = [float(r["multiplier"]) for r in rounds]
     if len(multipliers) < 8:
         return []
@@ -181,11 +183,6 @@ def candidates(rounds: Sequence[Round], settings: AnalysisSettings, analysis_pay
     exhaustion = payload.get("band_exhaustion", {})
     advanced_features = payload.get("advanced_features", {})
 
-    # Add ladder-enhanced moonshot prediction (selective integration)
-    ladder_release_conditions = analysis.find_release_conditions(multipliers, settings)
-    ladder_moonshot_probability = ladder_release_conditions["moonshot_probability"]
-    ladder_eta_info = ladder_eta_adjustment(multipliers, settings)
-
     labels = state_sequence(rounds, settings)
     matrix = transition_matrix(labels)
     markov_row = matrix.get(current_state, {})
@@ -194,25 +191,20 @@ def candidates(rounds: Sequence[Round], settings: AnalysisSettings, analysis_pay
     outcomes = dna.get("outcomes") or {}
     dna_weight = min(0.35, float(dna.get("confidence", 0.0)) * 0.35)
 
-    # Overdue-band tilt: pushes probability toward the upside states.
+    # Rate-based adjustment: Bayesian posterior from observed vs expected event rates.
     overdue = exhaustion.get("most_overdue") or {}
-    overdue_tilt = min(0.2, float(overdue.get("exhaustion", 0.0)) * 0.2)
+    rate_factor = 0.0
+    if overdue:
+        observed_rate = float(overdue.get("hit_rate", 0.0))
+        expected_rate = float(overdue.get("expected_rate", observed_rate))
+        if observed_rate > 0 and expected_rate > 0:
+            rate_factor = min(0.08, max(-0.08, (observed_rate - expected_rate) * 0.5))
 
     # Advanced feature tilts
-    pressure_tilt = 0.0
     momentum_tilt = 0.0
-    moonshot_tilt = 0.0
     band_collapse_tilt = 0.0
-    ladder_moonshot_tilt = 0.0  # New: ladder-enhanced moonshot prediction
 
     if advanced_features and not advanced_features.get("error"):
-        # Pressure tilt: boost moonshot/ignition when pressure is high
-        pressure_data = advanced_features.get("pressure", {})
-        if pressure_data:
-            pressure_percent = float(pressure_data.get("pressure_percent", 0))
-            if pressure_percent > 70.0:
-                pressure_tilt = min(0.15, (pressure_percent - 70.0) / 100.0 * 0.15)
-
         # Momentum tilt from baseline analysis
         baseline_data = advanced_features.get("baseline", {})
         if baseline_data:
@@ -222,13 +214,6 @@ def candidates(rounds: Sequence[Round], settings: AnalysisSettings, analysis_pay
                 momentum_value = float(latest_shift.get("momentum", 0))
                 if abs(momentum_value) > 5.0:
                     momentum_tilt = momentum_value / 100.0 * 0.1
-
-        # Moonshot confidence tilt
-        moonshot_data = advanced_features.get("moonshot", {})
-        if moonshot_data:
-            moonshot_confidence = float(moonshot_data.get("confidence", 0))
-            if moonshot_confidence > 0.7:
-                moonshot_tilt = min(0.12, (moonshot_confidence - 0.7) * 0.4)
 
         # Band collapse tilt from ladder analysis
         bands_data = advanced_features.get("bands", {})
@@ -241,11 +226,6 @@ def candidates(rounds: Sequence[Round], settings: AnalysisSettings, analysis_pay
                         band_collapse_tilt = min(0.1, collapse_freq * 3.0)
                         break
 
-    # Ladder-enhanced moonshot tilt (selective integration for moonshot prediction only)
-    if ladder_moonshot_probability > 0.6:
-        # Strong ladder signal for moonshot
-        ladder_moonshot_tilt = min(0.25, (ladder_moonshot_probability - 0.6) * 0.5)
-
     results: List[Dict[str, Any]] = []
     for state in ling.STATES:
         probability = float(markov_row.get(state, 0.0))
@@ -257,13 +237,9 @@ def candidates(rounds: Sequence[Round], settings: AnalysisSettings, analysis_pay
                 probability = probability * (1 - dna_weight) + (1.0 - float(outcomes.get("over_2x", 0.0))) * dna_weight
 
         if state in ("Moonshot", "Ignition"):
-            probability += overdue_tilt
-            probability += pressure_tilt
-            if state == "Moonshot":
-                probability += moonshot_tilt
-                probability += ladder_moonshot_tilt  # Apply ladder-enhanced moonshot prediction
+            probability += rate_factor
         elif state in ("Collapse", "Exhaustion"):
-            probability = max(0.0, probability - overdue_tilt * 0.5)
+            probability = max(0.0, probability - rate_factor * 0.5)
             probability += band_collapse_tilt
 
         # Apply momentum tilt based on direction
@@ -302,6 +278,38 @@ def candidates(rounds: Sequence[Round], settings: AnalysisSettings, analysis_pay
         entry["survival_estimate"] = dist.get(key, dist.get("2x", 0.0)) if key else 1.0
 
     return results
+
+
+def _forecast_range_for_state(
+    state: str,
+    band_lo: float,
+    band_hi: float,
+    expected: float,
+    spread: float,
+    multipliers: Sequence[float],
+) -> Tuple[float, float, float, str]:
+    """Range + expected for the headline forecast.
+
+    Tail states (Moonshot, Ignition) express the state band truthfully
+    (p90..p95) instead of squeezing the range around the p50-weighted blend;
+    non-tail states keep the blend-based window capped by the band.
+
+    Returns:
+        (range_lo, range_hi, expected, range_mode)
+    """
+    if state in ("Moonshot", "Ignition"):
+        recent_max = max(multipliers[-40:], default=1.0)
+        cap = max(50.0, recent_max * 1.5)          # finite, data-aware ceiling
+        hi = round(min(band_hi, cap), 2)
+        lo = round(max(1.0, band_lo), 2)
+        hi = max(lo + 0.05, hi)
+        anchor = (lo + hi) / 2.0
+        expected = max(expected, anchor)           # lift into the band
+        return lo, hi, round(min(hi, expected), 2), "state_band"
+    # Non-tail states: current behavior preserved.
+    lo = round(max(1.0, min(band_lo, expected - spread * 0.4)), 2)
+    hi = round(max(lo + 0.05, min(band_hi, expected + spread * 0.4)), 2)
+    return lo, hi, round(expected, 2), "blend"
 
 
 def forecast(rounds: Sequence[Round], settings: AnalysisSettings, analysis_payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -353,14 +361,6 @@ def forecast(rounds: Sequence[Round], settings: AnalysisSettings, analysis_paylo
                     feature_weight = 0.15
                     feature_contributors["baseline_momentum"] = round(latest_momentum, 2)
 
-        # Adjust for moonshot confidence
-        moonshot_data = advanced_features.get("moonshot", {})
-        if moonshot_data:
-            moonshot_confidence = float(moonshot_data.get("confidence", 0))
-            if moonshot_confidence > 0.7:
-                feature_weight = max(feature_weight, 0.2)
-                feature_contributors["moonshot_confidence"] = round(moonshot_confidence, 3)
-
         # Adjust for pressure
         pressure_data = advanced_features.get("pressure", {})
         if pressure_data:
@@ -383,8 +383,10 @@ def forecast(rounds: Sequence[Round], settings: AnalysisSettings, analysis_paylo
     ) / weight_total
 
     spread = max(0.15, statistics.pstdev(multipliers[-40:]) if len(multipliers) > 2 else 0.5)
-    range_lo = round(max(1.0, min(top["range_lo"], expected - spread * 0.4)), 2)
-    range_hi = round(max(range_lo + 0.05, max(top["range_hi"], expected + spread * 0.6)), 2)
+    range_lo, range_hi, expected, range_mode = _forecast_range_for_state(
+        top["state"], float(top["range_lo"]), float(top["range_hi"]),
+        expected, spread, multipliers,
+    )
 
     base_confidence = float(payload["prediction_confidence"]["confidence"])
     lead = top["probability"] - (ranked[1]["probability"] if len(ranked) > 1 else 0.0)
@@ -392,12 +394,28 @@ def forecast(rounds: Sequence[Round], settings: AnalysisSettings, analysis_paylo
     # Boost confidence if advanced features are available and show strong signals
     feature_confidence_boost = 0.0
     if advanced_features and not advanced_features.get("error"):
-        moonshot_confidence = float(advanced_features.get("moonshot", {}).get("confidence", 0))
         pressure_percent = float(advanced_features.get("pressure", {}).get("pressure_percent", 0))
-        if moonshot_confidence > 0.8 or pressure_percent > 85.0:
+        if pressure_percent > 85.0:
             feature_confidence_boost = 0.05
 
-    confidence = analysis.clamp((base_confidence * 0.55) + (lead * 1.4) + (float(dna.get("confidence", 0.0)) * 0.15) + feature_confidence_boost)
+    confidence = analysis.clamp((base_confidence * 0.55) + (lead * 1.0) + (float(dna.get("confidence", 0.0)) * 0.15) + feature_confidence_boost)
+
+    components: Dict[str, Any] = {
+        "markov_mid": round(markov_mid, 2),
+        "percentile_mid": round(percentile_mid, 2),
+        "dna_mid": round(dna_mid, 2),
+        "feature_mid": round(feature_mid, 2),
+        "weights": weights,
+        "spread": round(spread, 3),
+        "feature_contributors": feature_contributors,
+        "range_mode": range_mode,
+    }
+    if range_mode == "state_band":
+        # Idempotent with the helper's own cap rule, exposed for the UI.
+        components["band_anchor"] = round((range_lo + range_hi) / 2.0, 2)
+        components["range_hi_cap"] = round(
+            max(50.0, max(multipliers[-40:], default=1.0) * 1.5), 2
+        )
 
     return {
         "predicted_state": top["state"],
@@ -410,15 +428,7 @@ def forecast(rounds: Sequence[Round], settings: AnalysisSettings, analysis_paylo
         "horizon": settings.forecast_horizon,
         "candidates": ranked,
         "transition_matrix": transition_matrix(state_sequence(rounds, settings)),
-        "components": {
-            "markov_mid": round(markov_mid, 2),
-            "percentile_mid": round(percentile_mid, 2),
-            "dna_mid": round(dna_mid, 2),
-            "feature_mid": round(feature_mid, 2),
-            "weights": weights,
-            "spread": round(spread, 3),
-            "feature_contributors": feature_contributors,
-        },
+        "components": components,
         "features_available": bool(advanced_features and not advanced_features.get("error")),
         "note": ling.sentence(top["state"], multipliers[-10:]),
     }
@@ -555,14 +565,32 @@ def _sigmoid(value: float) -> float:
     return 1.0 / (1.0 + math.exp(-value))
 
 
-def ml_predictions(multipliers: Sequence[float], settings: AnalysisSettings) -> Dict[str, Any]:
-    """Bias-based moonshot prediction using simplified approach."""
+def ml_predictions(multipliers: Sequence[float], settings: AnalysisSettings, moonshot_sequence_analysis: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Bias-based moonshot prediction using simplified approach.
+    
+    Args:
+        multipliers: Sequence of multiplier values
+        settings: Analysis settings
+        moonshot_sequence_analysis: Optional moonshot sequence analysis to influence predictions
+        
+    Returns:
+        ML predictions with optional moonshot sequence enhancement
+    """
     features = ml_features(multipliers, settings)
     if not features:
         return {"available": False, "note": "Need at least 8 rounds.", "features": {}, "predictions": {}}
 
     empirical = ling.distribution(multipliers)
     predictions: Dict[str, Any] = {}
+
+    # Extract moonshot sequence influence if available
+    moonshot_boost = 0.0
+    if moonshot_sequence_analysis and moonshot_sequence_analysis.get("status") == "success":
+        prediction = moonshot_sequence_analysis.get("prediction", {})
+        if prediction.get("predicted"):
+            moonshot_confidence = prediction.get("confidence", 0.0)
+            # Apply moonshot sequence boost to higher thresholds (10x, 20x, etc.)
+            moonshot_boost = moonshot_confidence * 0.15  # Max 15% boost
 
     for target, weights in _ML_WEIGHTS.items():
         # Simplified bias-based prediction: use bias as primary indicator
@@ -578,12 +606,17 @@ def ml_predictions(multipliers: Sequence[float], settings: AnalysisSettings) -> 
         # Blend bias prediction with empirical data
         blended = analysis.clamp(bias_prob * 0.7 + empirical_prob * 0.3)
         
+        # Apply moonshot sequence boost to over_10x only (the only high threshold in _ML_WEIGHTS)
+        if target == "over_10x":
+            blended = analysis.clamp(blended + moonshot_boost)
+        
         predictions[target] = {
             "bias": round(bias, 4),
             "bias_probability": round(bias_prob, 4),
             "empirical": round(empirical_prob, 4),
             "blended": blended,
             "prediction_bias": round(bias, 4),  # Simplified: use bias as main indicator
+            "moonshot_boost": round(moonshot_boost, 4) if target == "over_10x" else 0.0,
         }
 
     return {
@@ -592,5 +625,6 @@ def ml_predictions(multipliers: Sequence[float], settings: AnalysisSettings) -> 
         "predictions": predictions,
         "samples": len(multipliers),
         "model": "bias-based-prediction-v1",
-        "note": "Simplified bias-based prediction using bias as primary indicator"
+        "note": "Simplified bias-based prediction using bias as primary indicator",
+        "moonshot_sequence_influence": round(moonshot_boost, 4) if moonshot_boost > 0 else 0.0
     }

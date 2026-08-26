@@ -512,8 +512,11 @@ def analysis_payload(source: str, limit: int = 600, use_cache: bool = True, inge
     payload["moonshot_eta"] = analysis.moonshot_eta(rounds, settings)
     payload["mega_scores"] = analysis.mega_moonshot_scores(rounds, settings)
     payload["gap_swing"] = payload["signals"].get("gap_swing", {})
+    
+    # Pass moonshot sequence analysis to ML predictions for enhanced moonshot forecasting
+    moonshot_seq_analysis = payload.get("moonshot_sequence_analysis", {})
     payload["ml"] = (
-        forecast.ml_predictions([float(r["multiplier"]) for r in rounds], settings)
+        forecast.ml_predictions([float(r["multiplier"]) for r in rounds], settings, moonshot_seq_analysis)
         if toggles.ml_predictions
         else {"available": False, "note": "ML engine disabled"}
     )

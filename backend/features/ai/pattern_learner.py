@@ -152,15 +152,32 @@ class MoonshotPatternLearner:
         if self.use_ml:
             return self._learn_with_ml(X, y, features, feature_names)
         else:
-            # Fallback to simple rule-based pattern learning
-            patterns = self._extract_simple_patterns(features, feature_names)
-            feature_importance = self._calculate_feature_importance(features, feature_names)
-            accuracy = self._calculate_accuracy(features, patterns)
-            
+            # Rule-based path: use a temporal train/test split so accuracy is
+            # measured out-of-sample, not on the data the patterns were
+            # derived from (which inflates reported accuracy to ~1.0).
+            split_idx = int(len(features) * 0.7)
+            train_features = features[:split_idx]
+            test_features = features[split_idx:]
+
+            patterns = self._extract_simple_patterns(train_features, feature_names)
+            feature_importance = self._calculate_feature_importance(train_features, feature_names)
+
+            # Evaluate on held-out test set
+            if test_features:
+                test_accuracy = self._calculate_accuracy(test_features, patterns)
+            else:
+                test_accuracy = 0.0
+
+            # Also report training accuracy for diagnostic purposes
+            train_accuracy = self._calculate_accuracy(train_features, patterns) if train_features else 0.0
+
             return {
                 "patterns": patterns,
                 "feature_importance": feature_importance,
-                "accuracy": round(accuracy, 4),
+                "accuracy": round(test_accuracy, 4),
+                "train_accuracy": round(train_accuracy, 4),
+                "test_samples": len(test_features),
+                "train_samples": len(train_features),
                 "feature_names": feature_names,
                 "method": "rule_based"
             }

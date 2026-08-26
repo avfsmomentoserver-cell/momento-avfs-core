@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS rounds (
     source_file   TEXT,
     ingest_method TEXT    NOT NULL DEFAULT 'api',
     created_at    TEXT    NOT NULL,
-    UNIQUE (source, timestamp, multiplier, ingest_method)
+    UNIQUE (source, timestamp, multiplier)
 );
 CREATE INDEX IF NOT EXISTS idx_rounds_source_ts ON rounds (source, timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_rounds_created ON rounds (created_at DESC);
@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS forecasts (
     predicted_state  TEXT    NOT NULL,
     predicted_band   TEXT,
     confidence       REAL    NOT NULL,
+    predicted_probability REAL,
     range_lo         REAL    NOT NULL,
     range_hi         REAL    NOT NULL,
     engine           TEXT    NOT NULL DEFAULT 'forecast',
@@ -310,6 +311,16 @@ def init_db() -> None:
     config.ensure_directories()
     with transaction() as conn:
         conn.executescript(SCHEMA)
+
+    # Secondary dedup index: the table's UNIQUE constraint includes
+    # ingest_method, so the same round ingested via different methods
+    # (e.g. 'api' vs 'csv') creates duplicates.  This index enforces
+    # uniqueness on the natural key (source, timestamp, multiplier)
+    # regardless of how the round arrived.
+    execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_rounds_source_ts_mult "
+        "ON rounds(source, timestamp, multiplier)"
+    )
 
     now = utc_now()
     for entry in config.DEFAULT_SOURCES:

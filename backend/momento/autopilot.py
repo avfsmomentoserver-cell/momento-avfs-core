@@ -324,6 +324,7 @@ def resolve(source: str, round_id: int, multiplier: float) -> int:
         action = str(row["action"])
         size = float(row["position_size"] or 0.0)
         target = float(row["exit_point"] or 0.0)
+        stop = float(row["stop_loss"] or 1.01)
 
         if action != "ENTER" or size <= 0:
             pnl = 0.0
@@ -331,6 +332,10 @@ def resolve(source: str, round_id: int, multiplier: float) -> int:
         elif float(multiplier) >= target:
             pnl = round(size * (target - 1.0), 2)
             won = 1
+        elif float(multiplier) >= stop:
+            exit_estimate = stop + (target - stop) * 0.25
+            pnl = round(size * (exit_estimate - 1.0) * -1.0, 2)
+            won = 0
         else:
             pnl = round(-size, 2)
             won = 0

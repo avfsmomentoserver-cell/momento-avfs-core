@@ -537,13 +537,25 @@ def extract_dna_features(rounds: List[Dict[str, Any]], window_size: int = 20) ->
     timestamps = [datetime.fromisoformat(r["timestamp"]).timestamp() for r in window]
 
     # Multiplier sequence features
+    # Compute log-return volatility separately from std_multiplier to avoid
+    # double-counting the same statistic with different feature names.
+    # Log-returns are scale-invariant and capture relative price swings,
+    # whereas std_multiplier captures absolute spread.
+    log_returns: List[float] = []
+    if len(multipliers) > 1:
+        for i in range(1, len(multipliers)):
+            if multipliers[i - 1] > 0:
+                # Floor denominator at 1.01 to avoid log(0) or extreme spikes
+                log_ret = math.log(multipliers[i] / max(1.01, multipliers[i - 1]))
+                log_returns.append(log_ret)
+
     features = {
         "mean_multiplier": statistics.mean(multipliers),
         "std_multiplier": statistics.stdev(multipliers) if len(multipliers) > 1 else 0,
         "min_multiplier": min(multipliers),
         "max_multiplier": max(multipliers),
         "momentum": multipliers[-1] - multipliers[0] if len(multipliers) > 1 else 0,
-        "volatility": statistics.stdev(multipliers) if len(multipliers) > 1 else 0,
+        "volatility": statistics.stdev(log_returns) if len(log_returns) > 1 else 0,
     }
 
     # Timing features

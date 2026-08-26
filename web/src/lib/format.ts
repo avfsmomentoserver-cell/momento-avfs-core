@@ -12,6 +12,12 @@ export function percent(value: number | null | undefined, digits = 0): string {
   return `${(Number(value) * 100).toFixed(digits)}%`;
 }
 
+/** Clamp a probability-like value into the 0..1 unit interval. Non-numeric input resolves to 0. */
+export function clamp01(value: number | null | undefined): number {
+  if (value == null || Number.isNaN(Number(value))) return 0;
+  return Math.min(1, Math.max(0, Number(value)));
+}
+
 export function decimal(value: number | null | undefined, digits = 2): string {
   if (value === null || value === undefined || Number.isNaN(value)) return "—";
   return Number(value).toFixed(digits);

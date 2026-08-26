@@ -4,7 +4,7 @@ import { EmptyState } from "@/components/console/EmptyState";
 import { Panel } from "@/components/console/Panel";
 import { Ring } from "@/components/console/Ring";
 import { StateBadge } from "@/components/console/StateBadge";
-import { decimal, multiplier, percent, stateColor } from "@/lib/format";
+import { clamp01, decimal, multiplier, percent, stateColor } from "@/lib/format";
 import type { ForecastResult } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -33,13 +33,15 @@ interface ForecastPanelProps {
 /** The headline forecast: predicted state, confidence ring and target range. */
 export function ForecastPanel({ forecast, actions, unifiedTarget, forecastReady, factorContributions, metrics }: ForecastPanelProps) {
   // Calculate blended confidence from all factors with NaN protection
-  const blendedConfidence = factorContributions 
-    ? Math.max(
-        Number(factorContributions.traditional) || 0, 
-        Number(factorContributions.megaplan) || 0, 
-        Number(factorContributions.sequence) || 0
-      )
-    : Number(forecast?.confidence) || 0;
+  const blendedConfidence = clamp01(
+    factorContributions
+      ? Math.max(
+          Number(factorContributions.traditional) || 0,
+          Number(factorContributions.megaplan) || 0,
+          Number(factorContributions.sequence) || 0
+        )
+      : Number(forecast?.confidence) || 0
+  );
 
   // Determine if we should show unified target with NaN protection
   const showUnifiedTarget = unifiedTarget && 
@@ -101,7 +103,7 @@ export function ForecastPanel({ forecast, actions, unifiedTarget, forecastReady,
                     <div className="h-1.5 w-12 overflow-hidden rounded-full bg-muted">
                       <div 
                         className="h-full rounded-full bg-info transition-all" 
-                        style={{ width: `${factorContributions.traditional * 100}%` }}
+                        style={{ width: `${clamp01(factorContributions.traditional) * 100}%` }}
                       />
                     </div>
                     <span className="text-[10px] text-muted-foreground">traditional {percent(factorContributions.traditional)}</span>
@@ -110,7 +112,7 @@ export function ForecastPanel({ forecast, actions, unifiedTarget, forecastReady,
                     <div className="h-1.5 w-12 overflow-hidden rounded-full bg-muted">
                       <div 
                         className="h-full rounded-full bg-signal transition-all" 
-                        style={{ width: `${factorContributions.megaplan * 100}%` }}
+                        style={{ width: `${clamp01(factorContributions.megaplan) * 100}%` }}
                       />
                     </div>
                     <span className="text-[10px] text-muted-foreground">megaplan {percent(factorContributions.megaplan)}</span>
@@ -119,7 +121,7 @@ export function ForecastPanel({ forecast, actions, unifiedTarget, forecastReady,
                     <div className="h-1.5 w-12 overflow-hidden rounded-full bg-muted">
                       <div 
                         className="h-full rounded-full bg-violet transition-all" 
-                        style={{ width: `${factorContributions.sequence * 100}%` }}
+                        style={{ width: `${clamp01(factorContributions.sequence) * 100}%` }}
                       />
                     </div>
                     <span className="text-[10px] text-muted-foreground">sequence {percent(factorContributions.sequence)}</span>

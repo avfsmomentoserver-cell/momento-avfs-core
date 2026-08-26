@@ -1,14 +1,24 @@
 """Band relativity and dynamic band definition."""
 
+import math
 from typing import Any, Dict, List
 import statistics
+
+import momento.linguistics as ling
 
 
 class BandRelativity:
     """Compute band relativity and dynamic band definitions."""
-    
+
     def __init__(self) -> None:
-        self.band_order = ["low", "ignition", "moonshot", "mega"]
+        self.band_order: List[str] = (
+            list(ling.BAND_KEYS)
+            if hasattr(ling, "BAND_KEYS")
+            else [
+                "dust", "floor", "low", "base", "mid",
+                "high", "ignition", "moonshot", "mega", "cosmic",
+            ]
+        )
     
     def compute_band_relativity(self, rounds: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Compute how bands relate to each other.
@@ -113,27 +123,81 @@ class BandRelativity:
         return correlation
     
     def _compute_lead_lag(self, rounds: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Compute which bands lead others.
+        """Compute lead-lag relationships using cross-correlation.
+        
+        Builds per-band activity time series from the round sequence, then
+        measures whether activity in band A at time t predicts activity in
+        band B at time t+1 (lag-1 cross-correlation vs. lag-0 correlation).
         
         Args:
             rounds: Historical rounds
             
         Returns:
-            Lead-lag relationship data
+            Lead-lag relationship data with correlation values
         """
-        # Simplified: check if band transitions tend to follow patterns
-        lead_lag = {}
-        
+        lead_lag: Dict[str, Any] = {}
+
+        # Build band activity time series: each round sets 1 for its band, 0 for others
+        band_activity: Dict[str, List[int]] = {band: [] for band in self.band_order}
+        for r in rounds:
+            band = r.get("band", "unknown")
+            for b in self.band_order:
+                band_activity[b].append(1 if b == band else 0)
+
+        # Compute cross-correlation for each adjacent pair
         for i in range(len(self.band_order) - 1):
             current_band = self.band_order[i]
             next_band = self.band_order[i + 1]
-            
-            lead_lag[f"{current_band}_to_{next_band}"] = {
-                "leads": True,
-                "strength": 0.5  # Placeholder - would need more sophisticated analysis
-            }
-        
+
+            series_a = band_activity.get(current_band, [])
+            series_b = band_activity.get(next_band, [])
+
+            if len(series_a) > 10 and len(series_b) > 10:
+                # Lag-1: does current_band at t predict next_band at t+1?
+                corr_lag1 = self._correlation(series_a[:-1], series_b[1:])
+                corr_lag0 = self._correlation(series_a, series_b)
+
+                # Band A leads B if lag-1 correlation exceeds contemporaneous correlation
+                leads = corr_lag1 > corr_lag0
+                strength = abs(corr_lag1) if leads else abs(corr_lag0)
+
+                lead_lag[f"{current_band}_to_{next_band}"] = {
+                    "leads": leads,
+                    "strength": min(1.0, strength),
+                    "correlation_lag1": round(corr_lag1, 4),
+                    "correlation_lag0": round(corr_lag0, 4),
+                }
+            else:
+                lead_lag[f"{current_band}_to_{next_band}"] = {
+                    "leads": False,
+                    "strength": 0.0,
+                    "correlation_lag1": 0.0,
+                    "correlation_lag0": 0.0,
+                }
+
         return lead_lag
+
+    @staticmethod
+    def _correlation(series_a: List[int], series_b: List[int]) -> float:
+        """Compute Pearson correlation between two series.
+        
+        Returns 0.0 for degenerate inputs (mismatched lengths, zero variance).
+        """
+        if len(series_a) != len(series_b) or len(series_a) < 2:
+            return 0.0
+
+        n = len(series_a)
+        mean_a = sum(series_a) / n
+        mean_b = sum(series_b) / n
+
+        cov = sum((a - mean_a) * (b - mean_b) for a, b in zip(series_a, series_b)) / n
+        std_a = (sum((a - mean_a) ** 2 for a in series_a) / n) ** 0.5
+        std_b = (sum((b - mean_b) ** 2 for b in series_b) / n) ** 0.5
+
+        if std_a < 1e-9 or std_b < 1e-9:
+            return 0.0
+
+        return cov / (std_a * std_b)
     
     def _compute_synchronization(
         self,
@@ -154,7 +218,8 @@ class BandRelativity:
         for from_band in transition_matrix:
             for prob in transition_matrix[from_band].values():
                 if prob > 0:
-                    total_entropy += -prob * (prob if prob < 1 else 0)  # Simplified entropy
+                    # Shannon entropy: -p * log2(p), measures information content
+                    total_entropy += -prob * math.log2(prob)
                     count += 1
         
         if count == 0:

@@ -51,14 +51,28 @@ class PressureCalculator:
         # Closer to ceiling = higher energy
         # More frequent touches = higher energy
         # Higher velocity = higher energy
-        
-        proximity_factor = 1.0 / (distance_to_ceiling + 0.1)
-        frequency_factor = min(touch_frequency / 5.0, 2.0)
-        velocity_factor = min(approach_velocity * 10.0, 2.0)
-        
-        energy = proximity_factor * frequency_factor * velocity_factor * 10.0
-        
-        return min(energy, 100.0)
+        #
+        # The old formula (1/distance * freq * vel * 10) produced a binary
+        # cliff: rounds right at the ceiling dominated with huge spikes while
+        # everything further away collapsed to near-zero.  This made the
+        # pressure signal indistinguishable from noise.
+        #
+        # Fix: use exponential saturation for proximity (bounded 0-1),
+        # normalize frequency and velocity to [0,1], and combine with a
+        # weighted sum instead of a product.  The result discriminates
+        # smoothly across the full approach range.
+        import math
+
+        # Bounded proximity: exp-decay gives 1.0 at distance=0, ~0.61 at
+        # distance=1, ~0.08 at distance=5 — smooth, no cliff.
+        proximity_factor = math.exp(-distance_to_ceiling / 2.0)
+        frequency_norm = min(touch_frequency / 5.0, 1.0)
+        velocity_norm = min(approach_velocity * 5.0, 1.0)
+
+        # Weighted combination (proximity dominates, but all three contribute)
+        energy = (proximity_factor * 0.5 + frequency_norm * 0.3 + velocity_norm * 0.2) * 100.0
+
+        return min(100.0, max(0.0, energy))
     
     def _calculate_approach_velocity(self, history: List[float]) -> float:
         """Calculate velocity of approach to ceilings.

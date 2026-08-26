@@ -13,6 +13,8 @@ Architecture:
 
 from __future__ import annotations
 
+import os
+import re
 import sqlite3
 import threading
 from contextlib import contextmanager
@@ -21,11 +23,35 @@ from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional
 
 # Global database configuration
-GLOBAL_DB_PATH = Path("/home/pirates/Avfs_Core/global_data/momento_global.db")
+GLOBAL_DB_PATH = Path(os.environ.get(
+    "MOMENTO_GLOBAL_DB_PATH",
+    str(Path.home() / ".momento" / "global_data" / "momento_global.db"),
+))
 GLOBAL_DATA_DIR = GLOBAL_DB_PATH.parent
 
 _LOCK = threading.RLock()
 _LOCAL = threading.local()
+_INITIALIZED = False
+
+_VALID_IDENTIFIER = re.compile(r'^[a-zA-Z][a-zA-Z0-9_]{0,63}$')
+
+
+def _validate_identifier(name: str, context: str = "identifier") -> str:
+    """Validate a SQL identifier to prevent injection.
+
+    Args:
+        name: The identifier string to validate.
+        context: Human-readable label for error messages.
+
+    Returns:
+        The validated identifier unchanged.
+
+    Raises:
+        ValueError: If the identifier contains invalid characters.
+    """
+    if not isinstance(name, str) or not _VALID_IDENTIFIER.match(name):
+        raise ValueError(f"Invalid {context}: {name!r}")
+    return name
 
 
 def ensure_global_directories() -> None:
@@ -192,8 +218,20 @@ def _configure(conn: sqlite3.Connection) -> None:
     conn.execute("PRAGMA busy_timeout=5000")
 
 
+def _ensure_initialized() -> None:
+    """Run database initialization once on first connection."""
+    global _INITIALIZED
+    if not _INITIALIZED:
+        init_global_db()
+        _INITIALIZED = True
+
+
 def connection() -> sqlite3.Connection:
-    """Thread-local connection for global database."""
+    """Thread-local connection for global database.
+
+    Lazily initializes the database schema on first call.
+    """
+    _ensure_initialized()
     conn = getattr(_LOCAL, "conn", None)
     if conn is None:
         ensure_global_directories()
@@ -353,21 +391,33 @@ def log_audit(branch: str, actor: str, action: str, detail: str = "") -> None:
 # ============================================================================
 
 def store_branch_data(branch: str, table: str, data: Dict[str, Any]) -> int:
-    """Store branch-specific data in prefixed table."""
+    """Store branch-specific data in a prefixed table.
+
+    Args:
+        branch: Branch name (validated as SQL-safe identifier).
+        table: Table name (validated as SQL-safe identifier).
+        data: Column-value mapping to insert.
+
+    Returns:
+        The row ID of the inserted record.
+
+    Raises:
+        ValueError: If branch or table contains invalid characters.
+    """
+    _validate_identifier(branch, "branch")
+    _validate_identifier(table, "table")
     table_name = f"{branch}_{table}"
-    
-    # Build dynamic insert statement
+
     columns = list(data.keys())
     placeholders = ", ".join(["?"] * len(columns))
     columns_str = ", ".join(columns)
-    
+
     with transaction() as conn:
-        # Add created_at if not present
         if "created_at" not in data:
             columns.append("created_at")
             data["created_at"] = utc_now()
             placeholders += ", ?"
-        
+
         cursor = conn.execute(f"""
             INSERT INTO {table_name} ({columns_str})
             VALUES ({placeholders})
@@ -376,9 +426,24 @@ def store_branch_data(branch: str, table: str, data: Dict[str, Any]) -> int:
 
 
 def get_branch_data(branch: str, table: str, source: str, limit: int = 100) -> List[Dict[str, Any]]:
-    """Get branch-specific data from prefixed table."""
+    """Get branch-specific data from a prefixed table.
+
+    Args:
+        branch: Branch name (validated as SQL-safe identifier).
+        table: Table name (validated as SQL-safe identifier).
+        source: Source filter value.
+        limit: Maximum number of rows to return.
+
+    Returns:
+        List of row dictionaries ordered by timestamp descending.
+
+    Raises:
+        ValueError: If branch or table contains invalid characters.
+    """
+    _validate_identifier(branch, "branch")
+    _validate_identifier(table, "table")
     table_name = f"{branch}_{table}"
-    
+
     with transaction() as conn:
         query = f"SELECT * FROM {table_name} WHERE source = ? ORDER BY timestamp DESC LIMIT ?"
         rows = conn.execute(query, (source, limit)).fetchall()
@@ -437,18 +502,23 @@ def get_database_stats() -> Dict[str, Any]:
 
 
 def cleanup_old_data(days: int = 30) -> int:
-    """Clean up data older than specified days."""
-    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
-    cutoff_str = cutoff.isoformat()
-    
+    """Clean up audit log entries older than the specified number of days.
+
+    Args:
+        days: Age threshold in days. Entries with a ``created_at`` before
+              this cutoff are deleted.
+
+    Returns:
+        Number of rows deleted.
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff_iso = cutoff.isoformat(timespec="milliseconds")
+
     with transaction() as conn:
-        # Clean up old audit logs
         result = conn.execute(
-            "DELETE FROM audit_log WHERE created_at < ?", 
-            (cutoff_str,)
+            "DELETE FROM audit_log WHERE created_at < ?",
+            (cutoff_iso,),
         )
         return result.rowcount
 
 
-# Initialize on import
-init_global_db()

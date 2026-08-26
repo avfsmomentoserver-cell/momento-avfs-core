@@ -440,8 +440,10 @@ def analysis_payload(source: str, limit: int = 600, use_cache: bool = True) -> D
     payload["moonshot_eta"] = analysis.moonshot_eta(rounds, settings)
     payload["mega_scores"] = analysis.mega_moonshot_scores(rounds, settings)
     payload["gap_swing"] = payload["signals"].get("gap_swing", {})
+    
+    # Pass empty moonshot sequence analysis to ML predictions (plugins interface doesn't include moonshot sequence analysis)
     payload["ml"] = (
-        forecast.ml_predictions([float(r["multiplier"]) for r in rounds], settings)
+        forecast.ml_predictions([float(r["multiplier"]) for r in rounds], settings, {})
         if toggles.ml_predictions
         else {"available": False, "note": "ML engine disabled"}
     )
